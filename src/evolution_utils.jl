@@ -1,0 +1,251 @@
+"""
+Evolution Utilities for Semi-Automated LLM-driven Model Discovery
+
+進化計算の補助機能：
+- JSON形式でのデータ保存・読み込み
+- LLMへのフィードバック生成
+- 履歴管理（JSONL形式）
+- 多様性指標の計算
+"""
+module EvolutionUtils
+
+using JSON3
+using Statistics
+using Dates
+
+export save_feedback, load_models, append_history, calculate_diversity, 
+       generate_initial_feedback, format_model_for_display
+
+"""
+    save_feedback(generation::Int, evaluated::Vector, filepath::String)
+
+評価結果をJSON形式で保存（LLMに渡す用）
+
+# Arguments
+- `generation`: 現在の世代番号
+- `evaluated`: 評価済みモデルのVector（各要素は (model, score, coeffs, reason) のNamedTuple）
+- `filepath`: 保存先ファイルパス
+"""
+function save_feedback(generation::Int, evaluated::Vector, filepath::String)
+    # スコアでソート
+    sorted = sort(evaluated, by=x->x.score)
+    
+    feedback = Dict(
+        "generation" => generation,
+        "timestamp" => string(now()),
+        "evaluated_models" => [
+            Dict(
+                "id" => i,
+                "formula" => model.model,
+                "num_coeffs" => length(model.coeffs),
+                "score" => model.score,
+                "coefficients" => model.coeffs,
+                "reason" => get(model, :reason, ""),
+                "ep_type" => get(model, :ep_type, "")
+            )
+            for (i, model) in enumerate(sorted)
+        ],
+        "best_model" => Dict(
+            "formula" => sorted[1].model,
+            "score" => sorted[1].score,
+            "coefficients" => sorted[1].coeffs
+        ),
+        "statistics" => Dict(
+            "best_score" => sorted[1].score,
+            "worst_score" => sorted[end].score,
+            "mean_score" => mean([m.score for m in sorted]),
+            "median_score" => median([m.score for m in sorted]),
+            "population_size" => length(sorted)
+        )
+    )
+    
+    # JSON保存
+    open(filepath, "w") do io
+        JSON3.write(io, feedback)
+    end
+    
+    @info "Feedback saved to: $filepath"
+    return feedback
+end
+
+
+"""
+    load_models(filepath::String)
+
+LLMが生成したモデルをJSONファイルから読み込む
+
+# Returns
+Vector of NamedTuple with fields: model, num_coeffs, reason, ep_type
+"""
+function load_models(filepath::String)
+    if !isfile(filepath)
+        error("Model file not found: $filepath")
+    end
+    
+    data = JSON3.read(read(filepath, String))
+    
+    models = []
+    for m in data.models
+        push!(models, (
+            model = m.formula,
+            num_coeffs = m.num_coeffs,
+            reason = get(m, :reason, ""),
+            ep_type = get(m, :ep_type, "")
+        ))
+    end
+    
+    @info "Loaded $(length(models)) models from: $filepath"
+    return models
+end
+
+
+"""
+    append_history(generation::Int, evaluated::Vector, filepath::String)
+
+評価結果を履歴ログに追記（JSONL形式：1行1世代）
+
+各行は完全なJSON objectで、後から解析可能
+"""
+function append_history(generation::Int, evaluated::Vector, filepath::String)
+    sorted = sort(evaluated, by=x->x.score)
+    
+    history_entry = Dict(
+        "generation" => generation,
+        "timestamp" => string(now()),
+        "best_score" => sorted[1].score,
+        "mean_score" => mean([m.score for m in sorted]),
+        "best_model" => Dict(
+            "formula" => sorted[1].model,
+            "coefficients" => sorted[1].coeffs,
+            "reason" => get(sorted[1], :reason, "")
+        ),
+        "all_models" => [
+            Dict(
+                "formula" => m.model,
+                "score" => m.score,
+                "coefficients" => m.coeffs,
+                "reason" => get(m, :reason, ""),
+                "ep_type" => get(m, :ep_type, "")
+            )
+            for m in sorted
+        ]
+    )
+    
+    # JSONL形式で追記
+    open(filepath, "a") do io
+        JSON3.write(io, history_entry)
+        write(io, "\n")
+    end
+    
+    @info "History updated: Generation $generation"
+end
+
+
+"""
+    calculate_diversity(models::Vector)
+
+集団の多様性を計算（式の文字列の編集距離ベース）
+
+簡易実装：ユニークな式のパターン数 / 総数
+"""
+function calculate_diversity(models::Vector)
+    formulas = [m.model for m in models]
+    unique_count = length(unique(formulas))
+    total_count = length(formulas)
+    
+    return unique_count / total_count
+end
+
+
+"""
+    generate_initial_feedback(size::Int, filepath::String)
+
+初期集団（世代0）用のフィードバックを生成
+
+ランダムなサンプル式を提示してLLMに多様な初期集団を生成させる
+"""
+function generate_initial_feedback(size::Int, filepath::String)
+    feedback = Dict(
+        "generation" => 0,
+        "timestamp" => string(now()),
+        "request" => "initial_population",
+        "population_size" => size,
+        "instructions" => """
+        風車後流の速度欠損 ΔU(x, r) を記述する代数式を $(size)個生成してください。
+        
+        【利用可能な変数】
+        - x: 下流距離（正規化済み）
+        - r: 半径方向距離（正規化済み）
+        - k: 乱流運動エネルギー
+        - omega: 比散逸率
+        - nut: 渦粘性係数
+        
+        【係数表記ルール】
+        - 係数は a, b, c, d, e, f, g, ... を使用（順番通り）
+        - 数値は入れず、記号のみで表現
+        - Julia構文で記述（例: exp(-b*x), r^2, sqrt(k)）
+        
+        【物理的制約】
+        - x が大きくなると ΔU は減衰すること（例: exp(-b*x)）
+        - r 方向は対称であること（例: r^2, abs(r)）
+        - 負の速度欠損は非物理的
+        
+        【多様性】
+        以下のような異なるアプローチを含めてください：
+        - Gaussian型: exp(-b*x) * exp(-c*r^2)
+        - べき乗型: x^(-b) * (1 + c*r^2)^(-d)
+        - 乱流項含む: ... * (1 + e*k) または ... * (1 + e*nut)
+        - 複合型: 複数の効果を組み合わせ
+        
+        【出力形式】
+        以下のJSON形式で出力してください：
+        {
+          "generation": 1,
+          "models": [
+            {
+              "id": 1,
+              "formula": "a * exp(-b*x) * exp(-c*r^2)",
+              "num_coeffs": 3,
+              "reason": "Classic Gaussian profile",
+              "ep_type": "EP1"
+            },
+            ...
+          ]
+        }
+        """
+    )
+    
+    open(filepath, "w") do io
+        JSON3.write(io, feedback)
+    end
+    
+    @info "Initial feedback generated: $filepath"
+    println("\n" * "="^60)
+    println("📝 初期集団生成の準備完了")
+    println("="^60)
+    println("\n次のステップ：")
+    println("1. $filepath をGeminiに提示")
+    println("2. 生成された式を results/models_gen1.json に保存")
+    println("3. julia --project=. semi_auto_evolution.jl --evaluate 1 --input results/models_gen1.json")
+    println()
+end
+
+
+"""
+    format_model_for_display(model::NamedTuple)
+
+モデルを読みやすい形式で表示
+"""
+function format_model_for_display(model::NamedTuple)
+    println("Formula: $(model.model)")
+    println("Score: $(round(model.score, digits=6))")
+    println("Coefficients: $(round.(model.coeffs, digits=4))")
+    if haskey(model, :reason) && !isempty(model.reason)
+        println("Reason: $(model.reason)")
+    end
+    if haskey(model, :ep_type) && !isempty(model.ep_type)
+        println("EP Type: $(model.ep_type)")
+    end
+end
+
+end # module EvolutionUtils

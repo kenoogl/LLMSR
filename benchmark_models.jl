@@ -168,9 +168,8 @@ function benchmark()
             return Phase5.Evaluator.mse_eval(expr, params, x_vec, r_vec, k_vec, omega_vec, nut_vec, target_vec)
         end
         
-        # Dynamic search range: 0.0 to 100.0 for all coeffs
-        # This is a broad range; might need tuning if models are very sensitive
-        range = [(0.0, 100.0) for _ in 1:n_coeffs]
+        # Dynamic search range: -100.0 to 100.0 for all coeffs to allow offsets
+        range = [(-100.0, 100.0) for _ in 1:n_coeffs]
         
         res = bboptimize(loss; SearchRange = range, NumDimensions = n_coeffs, MaxTime = 120.0, TraceMode=:silent)
         return best_candidate(res), best_fitness(res)

@@ -176,10 +176,8 @@ function main()
     end
     
     # 4. Run Optimization
-    # Use positive range (0, 100) to avoid domain errors and instability.
-    # Although the benchmark allows negative offsets, for generic inspection, 
-    # stability is prioritized. The difference in MSE is negligible for visualization.
-    range = [(0.0, 100.0) for _ in 1:num_coeffs]
+    # Use broader range to allow negative offsets
+    range = [(-100.0, 100.0) for _ in 1:num_coeffs]
     
     res = bboptimize(loss; SearchRange = range, NumDimensions = num_coeffs, MaxTime = 120.0, TraceMode=:silent)
     

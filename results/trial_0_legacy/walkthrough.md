@@ -40,10 +40,10 @@
 
 ### 進化の推移
 
-![Evolution Curve](results/plots/evolution_curve.png)
+![Evolution Curve](plots/evolution_curve.png)
 *図1: 20世代にわたる最良スコア（緑）と平均スコア（赤）の推移*
 
-![Score Distribution](results/plots/score_distribution.png)
+![Score Distribution](plots/score_distribution.png)
 *図2: 各世代におけるモデルスコアの分布*
 
 ### ベンチマーク比較
@@ -58,10 +58,10 @@
 
 **速度プロファイル:**
 
-![Wake Profile at x/D=5](results/plots/benchmark_profiles_x5.png)
+![Wake Profile at x/D=5](plots/benchmark_profiles_x5.png)
 *図3: x/D = 5（近・中間後流）での速度欠損プロファイル*
 
-![Wake Profile at x/D=10](results/plots/benchmark_profiles_x10.png)
+![Wake Profile at x/D=10](plots/benchmark_profiles_x10.png)
 *図4: x/D = 10（遠方後流）での速度欠損プロファイル*
 
 **物理的洞察:**

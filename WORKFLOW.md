@@ -37,16 +37,17 @@ julia --project=. main.jl
 ### ステップ1: 初期集団の生成（世代0）
 
 ```bash
-julia --project=. semi_auto_evolution.jl --generate-initial --size 20
+julia --project=. semi_auto_evolution.jl --generate-initial --size 20 [--exp-name experiment_name]
 ```
 
 **出力**:
-- `results/feedback_gen0.json` が生成される
+**出力**:
+- `results/{exp_name}/feedback_gen0.json` が生成される
 - このファイルには、Geminiへの指示が含まれている
 
 **内容確認**:
 ```bash
-cat results/feedback_gen0.json | jq
+cat results/{exp_name}/feedback_gen0.json | jq
 ```
 
 ---
@@ -58,7 +59,7 @@ cat results/feedback_gen0.json | jq
 チャットで以下のように依頼：
 
 ```
-results/feedback_gen0.json を見て、
+results/{exp_name}/feedback_gen0.json を見て、
 風車後流モデルの構造式を20個生成してください。
 
 指示に従って、多様性のある式を生成してください。
@@ -81,28 +82,28 @@ results/feedback_gen0.json を見て、
 
 2. **Geminiの応答をファイルに保存**
 
-Geminiが生成したJSONを `results/models_gen1.json` に保存
+Geminiが生成したJSONを `results/{exp_name}/models_gen1.json` に保存
 
 ---
 
 ### ステップ3: 世代1の評価
 
 ```bash
-julia --project=. semi_auto_evolution.jl --evaluate 1 --input results/models_gen1.json
+julia --project=. semi_auto_evolution.jl --evaluate 1 [--exp-name experiment_name]
 ```
 
 **処理内容**:
 - 20個のモデルをそれぞれ評価（DEで係数最適化）
 - スコア（MSE）を計算
-- 結果を `results/feedback_gen1.json` に保存
-- 履歴を `results/history.jsonl` に追記
+- 結果を `results/{exp_name}/feedback_gen1.json` に保存
+- 履歴を `results/{exp_name}/history.jsonl` に追記
 
 **出力例**:
 ```
 🔬 Evaluating Generation 1
 ====================================================================
 
-📂 Loading models from: results/models_gen1.json
+📂 Loading models from: results/{exp_name}/models_gen1.json
    ✓ Loaded 20 models
 
 ⚙️  Evaluating models...
@@ -134,7 +135,7 @@ julia --project=. semi_auto_evolution.jl --evaluate 1 --input results/models_gen
 **4-1. feedback_gen1.json を Geminiに提示**
 
 ```
-results/feedback_gen1.json を見て、次世代（世代2）の
+results/{exp_name}/feedback_gen1.json を見て、次世代（世代2）の
 構造式を20個生成してください。
 
 前世代の結果を参考に、以下の戦略で生成してください：
@@ -154,12 +155,12 @@ results/feedback_gen1.json を見て、次世代（世代2）の
 
 **4-2. Geminiの応答を保存**
 
-`results/models_gen2.json` に保存
+`results/{exp_name}/models_gen2.json` に保存
 
 **4-3. 評価実行**
 
 ```bash
-julia --project=. semi_auto_evolution.jl --evaluate 2 --input results/models_gen2.json
+julia --project=. semi_auto_evolution.jl --evaluate 2 [--exp-name experiment_name]
 ```
 
 **4-4. これを世代20まで繰り返す**
@@ -171,17 +172,18 @@ julia --project=. semi_auto_evolution.jl --evaluate 2 --input results/models_gen
 任意の時点で、これまでの進化の様子を確認できます：
 
 ```bash
-julia --project=. visualize_evolution.jl
+julia --project=. visualize_evolution.jl [--exp-name experiment_name]
 ```
 
 **出力**:
-- `results/plots/evolution_curve.png` - 世代ごとのスコア推移
-- `results/plots/score_distribution.png` - スコア分布の箱ひげ図
-- `results/plots/evolution_summary.txt` - テキストサマリー
+**出力**:
+- `results/{exp_name}/plots/evolution_curve.png` - 世代ごとのスコア推移
+- `results/{exp_name}/plots/score_distribution.png` - スコア分布の箱ひげ図
+- `results/{exp_name}/plots/evolution_summary.txt` - テキストサマリー
 
 **サマリーの表示**:
 ```bash
-cat results/plots/evolution_summary.txt
+cat results/{exp_name}/plots/evolution_summary.txt
 ```
 
 ---
@@ -233,7 +235,7 @@ EP1とEP2を中心に、様々なアプローチを試してください。
 
 途中で中断しても問題ありません：
 
-- `results/history.jsonl` に全履歴が保存されている
+- `results/{exp_name}/history.jsonl` に全履歴が保存されている
 - 次回は直前の世代のfeedbackからGeminiに依頼
 - 世代番号を合わせて評価を再開
 
@@ -254,8 +256,8 @@ julia --project=. semi_auto_evolution.jl --generate-initial --size 10
 # 実験名 "gpt4_trial" で初期化
 julia --project=. semi_auto_evolution.jl --generate-initial --exp-name gpt4_trial
 
-# 評価時も実験名を指定
-julia --project=. semi_auto_evolution.jl --evaluate 1 --input results/gpt4_trial/models_gen1.json --exp-name gpt4_trial
+# 評価時も実験名を指定（--inputは省略可）
+julia --project=. semi_auto_evolution.jl --evaluate 1 --exp-name gpt4_trial
 
 # 可視化
 julia --project=. visualize_evolution.jl --exp-name gpt4_trial
@@ -296,7 +298,7 @@ EP3で修正を依頼。
 
 ### エラー: "Model file not found"
 
-→ `results/models_genN.json` のファイル名が正しいか確認
+→ `results/{exp_name}/models_genN.json` のファイル名が正しいか確認
 
 ### エラー: "All models failed evaluation"
 
@@ -325,7 +327,7 @@ EP3で修正を依頼。
 - [ ] 世代16-20: 精緻化と簡素化
 - [ ] 可視化実行
 - [ ] 最良モデルの検証
-- [ ] 結果のまとめ
+- [ ] 結果のまとめ（`results/{exp_name}/report.md` 作成）
 
 ---
 
@@ -336,18 +338,17 @@ EP3で修正を依頼。
 ```
 LLMSR/
 ├── results/
-│   ├── feedback_gen0.json
-│   ├── models_gen1.json
-│   ├── feedback_gen1.json
-│   ├── models_gen2.json
-│   ├── ...
-│   ├── models_gen20.json
-│   ├── feedback_gen20.json
-│   ├── history.jsonl           # 完全な履歴
-│   └── plots/
-│       ├── evolution_curve.png
-│       ├── score_distribution.png
-│       └── evolution_summary.txt
+│   ├── default/                # デフォルトの実験結果
+│   └── {exp_name}/             # 指定した実験名のディレクトリ
+│       ├── feedback_gen0.json
+│       ├── models_gen1.json
+│       ├── feedback_gen1.json
+│       ├── ...
+│       ├── history.jsonl
+│       ├── plots/
+│       │   ├── evolution_curve.png
+│       │   └── ...
+│       └── report.md           # 実験レポート（推奨）
 ```
 
 ---
@@ -380,17 +381,17 @@ LLMSR/
 
 ```bash
 # 特定の世代の最良モデルを描画 (例: Gen 20)
-julia --project=. inspect_model.jl --gen 20 --best
+julia --project=. inspect_model.jl --gen 20 --best [--exp-name experiment_name]
 
 # 特定の世代の特定IDのモデルを描画 (例: Gen 7, ID 3)
-julia --project=. inspect_model.jl --gen 7 --id 3
+julia --project=. inspect_model.jl --gen 7 --id 3 [--exp-name experiment_name]
 
 # プロット位置を指定する場合 (デフォルトは 5.0,10.0)
-julia --project=. inspect_model.jl --gen 20 --best --x-locs "2.0,5.0,8.0,12.0"
+julia --project=. inspect_model.jl --gen 20 --best --x-locs "2.0,5.0,8.0,12.0" [--exp-name experiment_name]
 ```
 
 ### 出力
-生成されたグラフは `results/plots/` に保存されます。
+生成されたグラフは `results/{exp_name}/plots/` に保存されます。
 - ファイル名例: `inspect_gen20_best_x5.png`, `inspect_gen7_model3_x10.png`
 
 ### ⚠️ 注意点（ベンチマークとの違い）
@@ -407,7 +408,7 @@ julia --project=. inspect_model.jl --gen 20 --best --x-locs "2.0,5.0,8.0,12.0"
 ### 使用方法
 
 ```bash
-julia --project=. benchmark_models.jl
+julia --project=. benchmark_models.jl [--exp-name experiment_name]
 ```
 
 ### 処理内容
@@ -417,15 +418,15 @@ julia --project=. benchmark_models.jl
 4.  **サマリー生成:** 詳細な結果をテキストファイルに出力します。
 
 ### 出力
-- `results/plots/benchmark_profiles_xN.png`: 各モデルの速度プロファイル比較図
-- `results/plots/benchmark_summary.txt`: **詳細なベンチマーク結果**（数式、係数、データ条件、改善率など）
+- `results/{exp_name}/plots/benchmark_profiles_xN.png`: 各モデルの速度プロファイル比較図
+- `results/{exp_name}/plots/benchmark_summary.txt`: **詳細なベンチマーク結果**（数式、係数、データ条件、改善率など）
 
 ---
 
 ## 🐛 トラブルシューティング
 
 ### エラー: "Model file not found"
-→ `results/models_genN.json` のファイル名が正しいか確認
+→ `results/{exp_name}/models_genN.json` のファイル名が正しいか確認
 
 ### エラー: "All models failed evaluation"
 → 生成された式に構文エラーがある可能性

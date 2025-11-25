@@ -214,13 +214,17 @@ function main()
         
     elseif args["evaluate"] > 0
         # 世代の評価
-        if isempty(args["input"])
-            error("--input argument is required for evaluation")
+        input_file = args["input"]
+        if isempty(input_file)
+            # inputが指定されていない場合はデフォルトパスを生成
+            # results/{exp_name}/models_gen{gen}.json
+            input_file = joinpath("results", args["exp-name"], "models_gen$(args["evaluate"]).json")
+            println("ℹ️  Input file not specified. Using default: $input_file")
         end
         
         evaluate_generation(
             args["evaluate"],
-            args["input"],
+            input_file,
             args["csv-path"],
             args["exp-name"]
         )

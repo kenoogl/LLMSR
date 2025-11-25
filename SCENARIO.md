@@ -44,8 +44,8 @@ ls -lh data/result_I0p3000_C22p0000.csv
 ### 1.3 サンプル実行（動作確認）
 
 ```bash
-# メインスクリプトを実行
-julia --project=. main.jl
+# ヘルプを表示して動作確認
+julia --project=. semi_auto_evolution.jl --help
 ```
 
 **期待される出力**:
@@ -120,36 +120,11 @@ LLMに以下のような指示を与えます：
 
 ### 2.3 Julia評価スクリプト
 
-生成された式を評価するためのスクリプトを作成：
+`semi_auto_evolution.jl` を使用して評価を行います：
 
-```julia
-# evaluate_llm_models.jl
-using .Phase5
-
-models = [
-    ("a * exp(-b*x) * exp(-c*r^2)", 3),
-    ("a * x^(-b) * (1 + c*r^2)^(-d)", 4),
-    ("a * exp(-b*x) * (1 + c*r^2)^(-d) * (1 + e*nut)", 5),
-]
-
-results = []
-for (model, num_coeffs) in models
-    println("Evaluating: $model")
-    score, θ = evaluate_formula(model; num_coeffs=num_coeffs)
-    push!(results, (model=model, score=score, coeffs=θ))
-    println("  Score: $score")
-    println("  Coefficients: $θ")
-    println()
-end
-
-# 結果をソート（スコアが良い順）
-sort!(results, by=x->x.score)
-println("\n=== Best Models ===")
-for (i, r) in enumerate(results[1:3])
-    println("$i. Score: $(r.score)")
-    println("   Model: $(r.model)")
-    println("   Coeffs: $(r.coeffs)")
-end
+```bash
+# 評価の実行（実験名 gpt4_trial）
+julia --project=. semi_auto_evolution.jl --evaluate 1 --exp-name gpt4_trial
 ```
 
 ### 2.4 結果をLLMにフィードバック
@@ -193,46 +168,21 @@ end
 評価 → 選択 → 次世代...（20世代繰り返す）
 ```
 
-### 3.2 自動化スクリプトの擬似コード
+### 3.2 自動化スクリプトの実行
 
-```julia
-# evolutionary_search.jl
+`semi_auto_evolution.jl` は単一世代の評価を行うツールです。これを繰り返すことで進化計算を進めます。
 
-# 初期集団の生成
-generation = 0
-population = llm_generate_initial_population(size=20)
+```bash
+# 初期集団生成
+julia --project=. semi_auto_evolution.jl --generate-initial --exp-name gpt4_trial
 
-best_scores = []
-all_models = []
+# 世代1の評価
+julia --project=. semi_auto_evolution.jl --evaluate 1 --exp-name gpt4_trial
 
-for gen in 1:20
-    println("=== Generation $gen ===")
-    
-    # 各個体を評価
-    evaluated = []
-    for (model, num_coeffs) in population
-        score, θ = evaluate_formula(model; num_coeffs=num_coeffs)
-        push!(evaluated, (model=model, score=score, coeffs=θ))
-    end
-    
-    # ソート
-    sort!(evaluated, by=x->x.score)
-    push!(best_scores, evaluated[1].score)
-    append!(all_models, evaluated)
-    
-    # 結果をLLMにフィードバック
-    feedback = create_feedback(evaluated, gen)
-    
-    # 次世代を生成（EP戦略）
-    population = llm_generate_next_generation(
-        feedback,
-        best_models=evaluated[1:5],
-        ep_weights=[0.3, 0.3, 0.2, 0.2]  # EP1, EP2, EP3, EP4
-    )
-end
+# （LLMで世代2を生成して保存）
 
-# 最終結果の保存
-save_results("results/evolution_history.json", all_models, best_scores)
+# 世代2の評価
+julia --project=. semi_auto_evolution.jl --evaluate 2 --exp-name gpt4_trial
 ```
 
 ### 3.3 EP（Evolutionary Prompts）の詳細
@@ -293,46 +243,22 @@ Score: 0.00085（わずかに改善）
 
 ### 4.1 進化の履歴をプロット
 
-```julia
-using Plots
-
-# ベストスコアの推移
-plot(best_scores, 
-     xlabel="Generation", 
-     ylabel="Best MSE Score",
-     title="Evolution of Wake Models",
-     marker=:circle,
-     linewidth=2)
-savefig("results/evolution_curve.png")
+```bash
+julia --project=. visualize_evolution.jl --exp-name gpt4_trial
 ```
 
 ### 4.2 最終モデルの検証
 
-```julia
-# 最良モデルを取得
-best_model = all_models[argmin([m.score for m in all_models])]
-
-println("=== Best Model Found ===")
-println("Formula: $(best_model.model)")
-println("Score: $(best_model.score)")
-println("Coefficients: $(best_model.coeffs)")
-
-# 予測値 vs 実測値のプロット
-# （実装省略）
+```bash
+julia --project=. inspect_model.jl --gen 20 --best --exp-name gpt4_trial
 ```
 
 ---
 
-## 🚀 Phase 5: 本番実行
-
-### 5.1 完全自動化の実行
+## 🚀 Phase 5: ベンチマーク
 
 ```bash
-# 20世代の進化計算を実行
-julia --project=. evolutionary_search.jl
-
-# 結果の確認
-ls -lh results/
+julia --project=. benchmark_models.jl --exp-name gpt4_trial
 ```
 
 ### 5.2 期待される出力
@@ -349,8 +275,8 @@ Formula: a * exp(-b*x) * (1 + c*r^2)^(-d) * (1 + e*k^0.5) * (1 + f*nut)
 Score: 0.00047
 Coefficients: [0.94, 0.025, 1.15, 0.68, 0.22, 0.18]
 
-Results saved to: results/evolution_history.json
-```
+# 最終結果の保存
+save_results("results/{exp_name}/evolution_history.json", all_models, best_scores)
 
 ---
 
@@ -421,7 +347,7 @@ end
 - [ ] LLM APIの選択と設定
 - [ ] 手動で1世代の評価→フィードバック→次世代生成を実行
 - [ ] EP1〜EP4のプロンプトテンプレート作成
-- [ ] 自動化スクリプト `evolutionary_search.jl` の実装
+- [ ] 自動化スクリプト `semi_auto_evolution.jl` の実装
 - [ ] 20世代の進化計算を実行
 - [ ] 結果の分析と可視化
 - [ ] 論文執筆用のデータ整理

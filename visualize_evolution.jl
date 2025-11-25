@@ -60,25 +60,31 @@ function plot_evolution_curve(history::Vector, output_dir::String="results/plots
     best_scores = [h.best_score for h in history]
     mean_scores = [h.mean_score for h in history]
     
+    # Create plot with first y-axis for Best Score
     p = plot(
         generations, 
         best_scores,
         label="Best Score",
         xlabel="Generation",
-        ylabel="MSE Score",
+        ylabel="Best Score (MSE)",
         title="Evolution of Wake Models",
         marker=:circle,
         linewidth=2,
+        color=:blue,
         legend=:topright,
         grid=true,
         size=(800, 500)
     )
     
-    plot!(p, generations, mean_scores,
+    # Add second y-axis for Mean Score
+    plot!(twinx(), generations, mean_scores,
           label="Mean Score",
+          ylabel="Mean Score (MSE)",
           marker=:square,
           linewidth=2,
-          linestyle=:dash)
+          linestyle=:dash,
+          color=:red,
+          legend=:right)
     
     # 保存
     mkpath(output_dir)
@@ -87,6 +93,7 @@ function plot_evolution_curve(history::Vector, output_dir::String="results/plots
     
     return p
 end
+
 
 
 """

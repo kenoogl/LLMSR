@@ -353,3 +353,72 @@ LLMSR/
 4. **他のLLMとの比較**
    - GPT-4o, Claude でも同じ実験
    - 結果の比較分析
+
+## 7. モデルの詳細分析 (Model Inspection)
+
+特定の世代の特定のモデルを個別に可視化し、CFDデータと比較するためのツール `inspect_model.jl` を使用できます。
+
+### 使用方法
+
+```bash
+# 特定の世代の最良モデルを描画 (例: Gen 20)
+julia --project=. inspect_model.jl --gen 20 --best
+
+# 特定の世代の特定IDのモデルを描画 (例: Gen 7, ID 3)
+julia --project=. inspect_model.jl --gen 7 --id 3
+
+# プロット位置を指定する場合 (デフォルトは 5.0,10.0)
+julia --project=. inspect_model.jl --gen 20 --best --x-locs "2.0,5.0,8.0,12.0"
+```
+
+### 出力
+生成されたグラフは `results/plots/` に保存されます。
+- ファイル名例: `inspect_gen20_best_x5.png`, `inspect_gen7_model3_x10.png`
+
+### ⚠️ 注意点（ベンチマークとの違い）
+`inspect_model.jl` は汎用的な可視化ツールであるため、**安定性を重視して正の値の係数のみを探索**します（MSE $\approx 0.0003$）。
+一方、後述の `benchmark_models.jl` は、モデル構造を特定した上で負のオフセット項なども許容する**厳密な最適化**を行うため、より高い精度（MSE $\approx 0.00008$）を示します。
+グラフの見た目上の差はわずかですが、数値的な厳密さを求める場合はベンチマークツールを使用してください。
+
+---
+
+## 8. ベンチマークと最終評価 (Benchmarking)
+
+発見された最良モデルを、標準的な後流モデル（Jensen, Bastankhah）と厳密に比較するためのツール `benchmark_models.jl` を使用します。
+
+### 使用方法
+
+```bash
+julia --project=. benchmark_models.jl
+```
+
+### 処理内容
+1.  **データの厳密な読み込み:** `Phase5.load_wake_data` を使用し、進化計算時と全く同じデータ条件を保証します。
+2.  **標準モデルの最適化:** JensenモデルとBastankhahモデルの係数を最適化します。
+3.  **LLMモデルの再最適化:** 発見された最良モデル（Gen 20）に対し、負の値（オフセット項）も許容する**手動チューニングされた範囲**で再最適化を行い、真の性能を引き出します。
+4.  **サマリー生成:** 詳細な結果をテキストファイルに出力します。
+
+### 出力
+- `results/plots/benchmark_profiles_xN.png`: 各モデルの速度プロファイル比較図
+- `results/plots/benchmark_summary.txt`: **詳細なベンチマーク結果**（数式、係数、データ条件、改善率など）
+
+---
+
+## 🐛 トラブルシューティング
+
+### エラー: "Model file not found"
+→ `results/models_genN.json` のファイル名が正しいか確認
+
+### エラー: "All models failed evaluation"
+→ 生成された式に構文エラーがある可能性
+→ JSON形式が正しいか確認（`jq` で検証）
+→ **修正済み:** 以前は `exp(vector)` のような式でエラーが発生していましたが、`src/evaluator.jl` に**自動ベクトル化機能**を追加したため、現在は `a * exp(-b*x)` のような式も正常に計算されます。
+
+### スコアが改善しない
+→ Geminiへのフィードバックを詳しくする
+→ EP2（局所改善）の比率を上げる
+→ 物理的ヒントを追加（「乱流項を入れてみてください」など）
+
+### 式が複雑すぎる
+→ EP4（簡素化）を依頼
+→ 係数数の上限を設定（例: 5個まで）

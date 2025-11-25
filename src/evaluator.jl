@@ -50,10 +50,35 @@ function eval_model(ex::Expr, θ, x, r, k, omega, nut)
     localvars[:nut] = nut
 
     # 評価
+    # ベクトル化対応: 数式内の演算子や関数をドット演算子に変換する
+    # 例: a * exp(-b*x) -> a .* exp.(-b .* x)
+    
+    function vectorize_expr(ex)
+        if isa(ex, Expr)
+            if ex.head == :call
+                # 関数呼び出し (e.g. *, exp, +, ^) を broadcast に変換
+                func = ex.args[1]
+                args = map(vectorize_expr, ex.args[2:end])
+                
+                # Expr(:call, :broadcast, func, args...) を生成
+                # これにより f(x) -> broadcast(f, x) -> f.(x) と等価になる
+                return Expr(:call, :broadcast, func, args...)
+            else
+                # その他の式構造 (block, let, etc.) は再帰的に処理
+                return Expr(ex.head, map(vectorize_expr, ex.args)...)
+            end
+        else
+            # シンボルやリテラルはそのまま
+            return ex
+        end
+    end
+    
+    vectorized_ex = vectorize_expr(ex)
+    
     try
-        return eval(Expr(:let,
-            [:( $(k) = $(v) ) for (k,v) in localvars]...,
-            ex))
+        # Expr(:let, assignments_block, body)
+        assignments = Expr(:block, [:( $(k) = $(v) ) for (k,v) in localvars]...)
+        return eval(Expr(:let, assignments, vectorized_ex))
     catch e
         @error "eval_model failed" e
         return fill(1e9, length(x))  # 失敗したら巨大値

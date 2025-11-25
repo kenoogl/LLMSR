@@ -98,7 +98,8 @@ function evaluate_formula(model_str::String;
             num_coeffs=num_coeffs,
             with_penalty=with_penalty,
             mse_eval=Evaluator.mse_eval,
-            physical_penalty=Evaluator.physical_penalty
+            physical_penalty=Evaluator.physical_penalty,
+            search_range=(-100.0, 100.0)
         )
         
         return (score, θ_opt)

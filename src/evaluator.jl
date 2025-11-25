@@ -93,6 +93,17 @@ end
 """
 function mse_eval(ex, θ, x, r, k, omega, nut, deltaU)
     ŷ = eval_model(ex, θ, x, r, k, omega, nut)
+    
+    # 安全性チェック: NaNやInfが含まれる場合はペナルティ
+    if any(isnan, ŷ) || any(isinf, ŷ)
+        return 1e9
+    end
+    
+    # 巨大な値もペナルティ（オーバーフロー対策）
+    if any(abs.(ŷ) .> 1e6)
+        return 1e9
+    end
+
     return mean((ŷ .- deltaU).^2)
 end
 

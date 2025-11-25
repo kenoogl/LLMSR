@@ -24,6 +24,7 @@ include("src/evolution_utils.jl")
 
 using .Phase5
 using .EvolutionUtils
+using Statistics
 
 # コマンドライン引数のパース
 function parse_commandline()

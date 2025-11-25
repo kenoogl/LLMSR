@@ -87,22 +87,37 @@ function plot_score_distribution(history::Vector, output_dir::String="results/pl
     all_scores = []
     labels = String[]
     
+    all_scores = Float64[]
+    gen_indices = Int[]
+    
+    # Extract mean and best scores for lines
+    mean_scores = [h.mean_score for h in history]
+    best_scores = [h.best_score for h in history]
+
     for h in history
         scores = [m.score for m in h.all_models]
         append!(all_scores, scores)
-        append!(labels, fill("Gen $(h.generation)", length(scores)))
+        append!(gen_indices, fill(h.generation, length(scores)))
     end
     
-    p = boxplot(
-        labels,
+    # Use scatter plot instead of boxplot to avoid StatsPlots dependency
+    p = scatter(
+        gen_indices,
         all_scores,
         xlabel="Generation",
-        ylabel="MSE Score",
-        title="Score Distribution by Generation",
+        ylabel="Score (MSE)",
+        title="Score Distribution per Generation",
         legend=false,
-        grid=true,
+        alpha=0.6,
+        markersize=3,
+        color=:blue,
         size=(800, 500)
     )
+    
+    # Add mean line
+    plot!(p, 1:length(mean_scores), mean_scores, color=:red, linewidth=2, label="Mean")
+    # Add best line
+    plot!(p, 1:length(best_scores), best_scores, color=:green, linewidth=2, label="Best")
     
     # 保存
     savefig(p, joinpath(output_dir, "score_distribution.png"))

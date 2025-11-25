@@ -266,3 +266,49 @@
   "ep_type": "EP4"
 }
 ```
+
+---
+
+## 2. Evolution Strategy Phases
+
+Please apply the following strategy based on the current generation number:
+
+| Phase | Generations | Strategy | Focus |
+| :--- | :--- | :--- | :--- |
+| **Exploration** | 1 - 5 | **EP1 (Diversity)** | Try various mathematical structures (Power-law, Gaussian, polynomial, etc.) and different turbulence variables ($k$, $\nu_t$, $\omega$). Maximize structural diversity. |
+| **Exploitation** | 6 - 15 | **EP2 (Improvement) + EP3 (Physics)** | Refine the best models found so far. Combine successful features. Enforce physical constraints (decay at infinity, radial symmetry). |
+| **Refinement** | 16 - 20 | **EP4 (Simplification)** | Remove unnecessary terms. Simplify coefficients (e.g., $a \approx 1$). Focus on parsimony and interpretability. |
+
+## 3. Input Data
+
+You will be provided with a JSON file content (e.g., `feedback_genX.json`) containing:
+- `generation`: Current generation number $N$.
+- `best_model`: The best performing model of generation $N$.
+- `statistics`: Population statistics.
+- `evaluated_models`: List of all models in generation $N$ with their scores and reasons.
+
+## 4. Task
+
+1.  **Analyze** the feedback from generation $N$. Identify which structures worked best.
+2.  **Determine** the strategy for generation $N+1$ based on the "Evolution Strategy Phases" table above.
+3.  **Generate** 20 new model formulas for generation $N+1$.
+4.  **Output** the result in the specified JSON format.
+
+## 5. Output Format
+
+必ず以下の形式で出力してください：
+
+```json
+{
+  "generation": <世代番号>,
+  "models": [
+    {
+      "id": <1から始まる連番>,
+      "formula": "<Julia形式の式>",
+      "num_coeffs": <係数の個数>,
+      "reason": "<1-2文の説明>",
+      "ep_type": "<EP1 | EP2 | EP3 | EP4>"
+    }
+  ]
+}
+```

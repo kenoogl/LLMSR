@@ -244,9 +244,27 @@ EP1とEP2を中心に、様々なアプローチを試してください。
 ```bash
 # 初期集団を10個に変更
 julia --project=. semi_auto_evolution.jl --generate-initial --size 10
-
-# 以降も10個ずつ生成してもらう
 ```
+
+### 5. 複数の実験を管理する（推奨）
+
+異なるLLMや設定で試行を行う場合、`--exp-name` オプションを使用して結果の保存先を分けることができます。
+
+```bash
+# 実験名 "gpt4_trial" で初期化
+julia --project=. semi_auto_evolution.jl --generate-initial --exp-name gpt4_trial
+
+# 評価時も実験名を指定
+julia --project=. semi_auto_evolution.jl --evaluate 1 --input results/gpt4_trial/models_gen1.json --exp-name gpt4_trial
+
+# 可視化
+julia --project=. visualize_evolution.jl --exp-name gpt4_trial
+
+# ベンチマーク
+julia --project=. benchmark_models.jl --exp-name gpt4_trial
+```
+
+結果は `results/gpt4_trial/` ディレクトリに保存されます。デフォルトは `results/default/` です。
 
 ---
 

@@ -28,6 +28,10 @@ function parse_commandline()
             help = "Comma-separated x/D locations to plot (default: 5.0,10.0)"
             arg_type = String
             default = "5.0,10.0"
+        "--exp-name"
+            help = "Experiment name"
+            arg_type = String
+            default = "default"
     end
     return parse_args(s)
 end
@@ -80,9 +84,14 @@ function main()
     use_best = args["best"]
     x_locs_str = args["x-locs"]
     x_locs = parse.(Float64, split(x_locs_str, ","))
+    exp_name = args["exp-name"]
+    
+    base_dir = joinpath("results", exp_name)
+    plots_dir = joinpath(base_dir, "plots")
+    mkpath(plots_dir)
 
     # Load Feedback JSON
-    json_path = "results/feedback_gen$(gen).json"
+    json_path = joinpath(base_dir, "feedback_gen$(gen).json")
     if !isfile(json_path)
         println("❌ Error: Feedback file not found: $json_path")
         return
@@ -225,7 +234,7 @@ function main()
         
         # Save
         filename = use_best ? "inspect_gen$(gen)_best_x$(Int(x_loc)).png" : "inspect_gen$(gen)_model$(model_id)_x$(Int(x_loc)).png"
-        output_path = joinpath("results/plots", filename)
+        output_path = joinpath(plots_dir, filename)
         savefig(p, output_path)
         println("   Saved: $output_path")
     end

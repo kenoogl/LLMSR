@@ -13,6 +13,18 @@ using JSON3
 using Statistics
 using Plots
 using Printf
+using ArgParse
+
+function parse_commandline()
+    s = ArgParseSettings()
+    @add_arg_table! s begin
+        "--exp-name"
+            help = "Experiment name"
+            arg_type = String
+            default = "default"
+    end
+    return parse_args(s)
+end
 
 """
     load_history(filepath::String)
@@ -240,8 +252,16 @@ function main()
     println("📊 Visualizing Evolution Progress")
     println("="^70)
     
+    # コマンドライン引数
+    args = parse_commandline()
+    exp_name = args["exp-name"]
+    
+    base_dir = joinpath("results", exp_name)
+    history_path = joinpath(base_dir, "history.jsonl")
+    plots_dir = joinpath(base_dir, "plots")
+    
     # 履歴読み込み
-    history = load_history()
+    history = load_history(history_path)
     println("\n✓ Loaded history: $(length(history)) generations")
     
     if isempty(history)
@@ -251,17 +271,17 @@ function main()
     
     # 進化曲線
     println("\n📈 Plotting evolution curve...")
-    plot_evolution_curve(history)
+    plot_evolution_curve(history, plots_dir)
     
     # スコア分布
     if length(history) >= 2
         println("📊 Plotting score distribution...")
-        plot_score_distribution(history)
+        plot_score_distribution(history, plots_dir)
     end
     
     # サマリー出力
     println("\n📝 Generating summary...")
-    print_summary(history)
+    print_summary(history, joinpath(plots_dir, "evolution_summary.txt"))
     
     # EP戦略分析
     analyze_ep_strategy(history)
@@ -270,9 +290,9 @@ function main()
     println("✅ Visualization Complete!")
     println("="^70)
     println("\nOutput files:")
-    println("  - results/plots/evolution_curve.png")
-    println("  - results/plots/score_distribution.png")
-    println("  - results/plots/evolution_summary.txt")
+    println("  - $(joinpath(plots_dir, "evolution_curve.png"))")
+    println("  - $(joinpath(plots_dir, "score_distribution.png"))")
+    println("  - $(joinpath(plots_dir, "evolution_summary.txt"))")
     println()
 end
 

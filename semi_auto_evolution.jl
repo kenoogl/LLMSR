@@ -52,6 +52,10 @@ function parse_commandline()
             help = "Path to CFD data CSV"
             arg_type = String
             default = "data/result_I0p3000_C22p0000.csv"
+        "--exp-name"
+            help = "Experiment name (creates results/{exp_name}/)"
+            arg_type = String
+            default = "default"
     end
     
     return parse_args(s)
@@ -59,39 +63,40 @@ end
 
 
 """
-    generate_initial(size::Int)
+    generate_initial(size::Int, exp_name::String)
 
 初期集団（世代0）のフィードバックを生成
 """
-function generate_initial(size::Int)
+function generate_initial(size::Int, exp_name::String)
     println("\n" * "="^70)
     println("🌱 Generating Initial Population Feedback (Generation 0)")
     println("="^70)
     
     # resultsディレクトリ作成
-    mkpath("results")
-    mkpath("results/plots")
+    base_dir = joinpath("results", exp_name)
+    mkpath(base_dir)
+    mkpath(joinpath(base_dir, "plots"))
     
     # 初期フィードバック生成
-    feedback_path = "results/feedback_gen0.json"
+    feedback_path = joinpath(base_dir, "feedback_gen0.json")
     EvolutionUtils.generate_initial_feedback(size, feedback_path)
     
     println("\n✅ Initial feedback generated!")
     println("\n📋 Next steps:")
     println("   1. View feedback: cat $feedback_path")
     println("   2. Give the feedback to Gemini LLM")
-    println("   3. Save Gemini's response to: results/models_gen1.json")
-    println("   4. Run: julia --project=. semi_auto_evolution.jl --evaluate 1 --input results/models_gen1.json")
+    println("   3. Save Gemini's response to: $(joinpath(base_dir, "models_gen1.json"))")
+    println("   4. Run: julia --project=. semi_auto_evolution.jl --evaluate 1 --input $(joinpath(base_dir, "models_gen1.json")) --exp-name $exp_name")
     println()
 end
 
 
 """
-    evaluate_generation(gen::Int, input_file::String, csv_path::String)
+    evaluate_generation(gen::Int, input_file::String, csv_path::String, exp_name::String)
 
 指定世代のモデルを評価
 """
-function evaluate_generation(gen::Int, input_file::String, csv_path::String)
+function evaluate_generation(gen::Int, input_file::String, csv_path::String, exp_name::String)
     println("\n" * "="^70)
     println("🔬 Evaluating Generation $gen")
     println("="^70)
@@ -176,11 +181,12 @@ function evaluate_generation(gen::Int, input_file::String, csv_path::String)
     end
     
     # フィードバックJSON保存
-    feedback_path = "results/feedback_gen$gen.json"
+    base_dir = joinpath("results", exp_name)
+    feedback_path = joinpath(base_dir, "feedback_gen$gen.json")
     EvolutionUtils.save_feedback(gen, evaluated, feedback_path)
     
     # 履歴ログに追記
-    history_path = "results/history.jsonl"
+    history_path = joinpath(base_dir, "history.jsonl")
     EvolutionUtils.append_history(gen, evaluated, history_path)
     
     # 次のステップを表示
@@ -191,9 +197,9 @@ function evaluate_generation(gen::Int, input_file::String, csv_path::String)
     println("\n📋 Next steps:")
     println("   1. View feedback: cat $feedback_path")
     println("   2. Give the feedback to Gemini LLM")
-    println("   3. Save Gemini's response to: results/models_gen$next_gen.json")
-    println("   4. Run: julia --project=. semi_auto_evolution.jl --evaluate $next_gen --input results/models_gen$next_gen.json")
-    println("\n💡 To visualize progress: julia --project=. visualize_evolution.jl")
+    println("   3. Save Gemini's response to: $(joinpath(base_dir, "models_gen$next_gen.json"))")
+    println("   4. Run: julia --project=. semi_auto_evolution.jl --evaluate $next_gen --input $(joinpath(base_dir, "models_gen$next_gen.json")) --exp-name $exp_name")
+    println("\n💡 To visualize progress: julia --project=. visualize_evolution.jl --exp-name $exp_name")
     println()
 end
 
@@ -204,7 +210,7 @@ function main()
     
     if args["generate-initial"]
         # 初期集団生成
-        generate_initial(args["size"])
+        generate_initial(args["size"], args["exp-name"])
         
     elseif args["evaluate"] > 0
         # 世代の評価
@@ -215,7 +221,8 @@ function main()
         evaluate_generation(
             args["evaluate"],
             args["input"],
-            args["csv-path"]
+            args["csv-path"],
+            args["exp-name"]
         )
         
     else

@@ -4,7 +4,20 @@ using Statistics
 using BlackBoxOptim
 using Plots
 using JSON3
+using JSON3
 using Dates
+using ArgParse
+
+function parse_commandline()
+    s = ArgParseSettings()
+    @add_arg_table! s begin
+        "--exp-name"
+            help = "Experiment name"
+            arg_type = String
+            default = "default"
+    end
+    return parse_args(s)
+end
 
 # Include necessary modules
 include("src/Phase5.jl")
@@ -142,7 +155,14 @@ end
 # --- Main Benchmarking Function ---
 
 function benchmark()
-    println("🚀 Starting Benchmark...")
+    args = parse_commandline()
+    exp_name = args["exp-name"]
+    
+    base_dir = joinpath("results", exp_name)
+    plots_dir = joinpath(base_dir, "plots")
+    mkpath(plots_dir)
+
+    println("🚀 Starting Benchmark (Experiment: $exp_name)...")
     
     # 1. Load Data
     # 1. Load Data using Phase5 to ensure STRICT consistency with Evolution
@@ -246,11 +266,13 @@ function benchmark()
         plot!(p, r_vals, u_bast, label="Bastankhah", linewidth=2, linestyle=:dashdot, color=:orange)
         plot!(p, r_vals, u_llm, label="LLM (Best)", linewidth=3, color=:green)
         
-        savefig(p, "results/plots/benchmark_profiles_x$(Int(x_loc)).png")
+        plot!(p, r_vals, u_llm, label="LLM (Best)", linewidth=3, color=:green)
+        
+        savefig(p, joinpath(plots_dir, "benchmark_profiles_x$(Int(x_loc)).png"))
     end
     
     # 5. Save Summary
-    open("results/plots/benchmark_summary.txt", "w") do io
+    open(joinpath(plots_dir, "benchmark_summary.txt"), "w") do io
         println(io, "Benchmark Results Summary")
         println(io, "=========================")
         println(io, "Generated on: $(Dates.now())")
@@ -292,7 +314,7 @@ function benchmark()
         println(io, "Improvement over Bastankhah: $(round((bast_mse - llm_mse)/bast_mse * 100, digits=2))%")
     end
     
-    println("✅ Benchmark Complete! Results saved to results/plots/")
+    println("✅ Benchmark Complete! Results saved to $plots_dir")
 end
 
 # Run

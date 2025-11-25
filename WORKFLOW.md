@@ -326,8 +326,8 @@ EP3で修正を依頼。
 - [ ] 世代11-15: 物理性とバランスの調整
 - [ ] 世代16-20: 精緻化と簡素化
 - [ ] 可視化実行
-- [ ] 最良モデルの検証
-- [ ] 結果のまとめ（`results/{exp_name}/report.md` 作成）
+- [ ] 最良モデルの検証（ベンチマーク）
+- [ ] レポート作成（`prepare_report.jl` 実行）
 
 ---
 
@@ -408,7 +408,9 @@ julia --project=. inspect_model.jl --gen 20 --best --x-locs "2.0,5.0,8.0,12.0" [
 ### 使用方法
 
 ```bash
-julia --project=. benchmark_models.jl [--exp-name experiment_name]
+```bash
+julia --project=. benchmark_models.jl [--exp-name experiment_name] [--gen generation_number]
+```
 ```
 
 ### 処理内容
@@ -420,6 +422,27 @@ julia --project=. benchmark_models.jl [--exp-name experiment_name]
 ### 出力
 - `results/{exp_name}/plots/benchmark_profiles_xN.png`: 各モデルの速度プロファイル比較図
 - `results/{exp_name}/plots/benchmark_summary.txt`: **詳細なベンチマーク結果**（数式、係数、データ条件、改善率など）
+
+---
+
+## 9. レポート作成 (Reporting)
+
+実験結果をまとめたレポートを作成するためのコンテキスト情報を生成します。
+
+### 使用方法
+
+```bash
+julia --project=. prepare_report.jl [--exp-name experiment_name]
+```
+
+### 処理内容
+1.  `history.jsonl` から進化の履歴を読み込みます。
+2.  `benchmark_summary.txt` からベンチマーク結果を読み込みます。
+3.  これらを統合し、LLMにレポート執筆を依頼するためのプロンプトファイル `report_context.md` を生成します。
+
+### 次のステップ
+生成された `results/{exp_name}/report_context.md` の内容をコピーし、Gemini（または他のLLM）に貼り付けてください。
+「以下の情報を基に、実験レポートを作成してください」と依頼することで、詳細なレポートが得られます。
 
 ---
 

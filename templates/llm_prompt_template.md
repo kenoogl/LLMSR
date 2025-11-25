@@ -156,19 +156,19 @@
 ```
 【後期世代の追加指示】
 
-世代も後半になってきました。以下に注意してください：
+世代も後半になってきましたが、**上記の「EP戦略（厳守）」の比率は必ず守ってください。**
 
-1. **精緻化**: ベストモデルの微調整に集中
+1. **EP2（Improvement）の役割**: ベストモデルの微調整に集中
    - ほぼ同じ構造で、項の組み合わせを少し変える
    - 係数の配置を調整
 
-2. **簡素化**: 複雑さと精度のトレードオフ
+2. **EP1（Diversity）の役割**: 最後まで新しい可能性を捨てない
+   - まだ試していない極端な関数形や、全く異なる物理的仮説を試す
+   - 局所解に陥るのを防ぐ
+
+3. **EP4（Simplification）の役割**: 実用性の確保
    - 係数5個以下で高精度を目指す
    - オッカムの剃刀：単純な方が良い
-
-3. **物理的解釈**: 生成理由を物理的に説明
-   - なぜこの項が必要か
-   - 各項が何を表現しているか
 
 4. **最終候補の選定**: 
    - 論文に載せられるレベルの式を意識
@@ -269,15 +269,18 @@
 
 ---
 
-## 2. Evolution Strategy Phases
+## 2. Evolution Strategy (Strict Enforcement)
 
-Please apply the following strategy based on the current generation number:
+To avoid stagnation and ensure diverse exploration, you MUST strictly adhere to the following distribution of strategies for **EVERY** generation (except Gen 1):
 
-| Phase | Generations | Strategy | Focus |
-| :--- | :--- | :--- | :--- |
-| **Exploration** | 1 - 5 | **EP1 (Diversity)** | Try various mathematical structures (Power-law, Gaussian, polynomial, etc.) and different turbulence variables ($k$, $\nu_t$, $\omega$). Maximize structural diversity. |
-| **Exploitation** | 6 - 15 | **EP2 (Improvement) + EP3 (Physics)** | Refine the best models found so far. Combine successful features. Enforce physical constraints (decay at infinity, radial symmetry). |
-| **Refinement** | 16 - 20 | **EP4 (Simplification)** | Remove unnecessary terms. Simplify coefficients (e.g., $a \approx 1$). Focus on parsimony and interpretability. |
+| Strategy Type | Count | Purpose |
+| :--- | :--- | :--- |
+| **EP1 (Diversity)** | **4** | Explore completely NEW mathematical structures or variable combinations not seen in the top models. |
+| **EP2 (Improvement)** | **10** | Refine and extend the current best models (e.g., adding terms, adjusting powers). |
+| **EP3 (Physics)** | **4** | Fix physical violations (e.g., ensure decay at infinity, symmetry) or test theoretical constraints. |
+| **EP4 (Simplification)** | **2** | Simplify complex models (reduce coefficient count) while maintaining accuracy. |
+
+**CRITICAL:** Do NOT focus solely on EP2. You must generate exactly 4 EP1s, 4 EP3s, and 2 EP4s to maintain population diversity.
 
 ## 3. Input Data
 

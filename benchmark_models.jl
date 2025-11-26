@@ -219,7 +219,7 @@ function benchmark()
             slice_df.nut
         )
         
-        p = plot(r_vals, u_cfd, seriestype=:scatter, label="CFD (LES)", xlabel="r/D", ylabel="Δu/U", title="x/D = $x_loc", legend=:topright)
+        p = plot(r_vals, u_cfd, seriestype=:scatter, label="CFD (LES)", xlabel="r/D", ylabel="Δu/U", title="x/D = $x_loc", legend=:topright, size=(1200, 800))
         plot!(p, r_vals, u_jensen, label="Jensen", linestyle=:dash)
         plot!(p, r_vals, u_bast, label="Bastankhah", linestyle=:dashdot)
         plot!(p, r_vals, u_llm, label="LLM (Gen $gen)", linewidth=2)

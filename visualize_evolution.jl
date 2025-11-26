@@ -73,9 +73,9 @@ function plot_evolution_curve(history::Vector, output_dir::String="results/plots
         color=:blue,
         legend=:topright,
         grid=true,
-        size=(800, 500)
+        size=(1600, 1000)
     )
-    
+
     # Add second y-axis for Mean Score
     plot!(twinx(), generations, mean_scores,
           label="Mean Score",
@@ -130,7 +130,7 @@ function plot_score_distribution(history::Vector, output_dir::String="results/pl
         alpha=0.6,
         markersize=3,
         color=:blue,
-        size=(800, 500)
+        size=(1600, 1000)
     )
     
     # Add mean line

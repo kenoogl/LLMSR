@@ -226,7 +226,8 @@ function main()
         p = plot(r_vals, u_cfd, seriestype=:scatter, label="CFD (LES)", 
                  xlabel="Radial Distance (r/D)", ylabel="Velocity Deficit (Δu/U)", 
                  title="$title_str at x/D = $x_loc", legend=:topright, 
-                 markersize=3, color=:black, alpha=0.5)
+                 markersize=3, color=:black, alpha=0.5,
+                 size=(1200, 800))
         
         plot!(p, r_vals, u_pred, label="Model Prediction", linewidth=3, color=:red)
         

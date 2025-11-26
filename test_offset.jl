@@ -98,7 +98,7 @@ function test_offset()
         u_orig = Phase5.Evaluator.eval_model(expr_orig, coeffs_orig, fill(x_loc, nrow(slice_df)), slice_df.r_D, slice_df.k, slice_df.omega, slice_df.nut)
         u_offset = Phase5.Evaluator.eval_model(expr_offset, coeffs_offset, fill(x_loc, nrow(slice_df)), slice_df.r_D, slice_df.k, slice_df.omega, slice_df.nut)
         
-        p = plot(r_vals, u_cfd, seriestype=:scatter, label="CFD", xlabel="r/D", ylabel="Δu/U", title="x/D = $x_loc (Offset Test)")
+        p = plot(r_vals, u_cfd, seriestype=:scatter, label="CFD", xlabel="r/D", ylabel="Δu/U", title="x/D = $x_loc (Offset Test)", size=(1200, 800))
         plot!(p, r_vals, u_orig, label="Original", linewidth=2)
         plot!(p, r_vals, u_offset, label="With Offset", linewidth=2, linestyle=:dash)
         

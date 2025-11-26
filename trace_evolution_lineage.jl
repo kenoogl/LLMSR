@@ -162,6 +162,82 @@ function trace_lineage(history::Vector)
 end
 
 """
+    create_evolution_graph(lineage::Vector)
+
+Create a Mermaid graph showing the evolution path
+"""
+function create_evolution_graph(lineage::Vector)
+    graph = "```mermaid\ngraph TD\n"
+    
+    # Define nodes for each generation's best model
+    for l in lineage
+        gen = l.generation
+        score = round(l.score * 1000, digits=3)  # Convert to ×10^-3
+        
+        # Simplified formula for node label
+        formula_short = l.formula
+        # Truncate if too long
+        if length(formula_short) > 40
+            formula_short = formula_short[1:37] * "..."
+        end
+        
+        # Escape special characters for Mermaid
+        formula_short = replace(formula_short, "\"" => "'")
+        
+        node_id = "G$gen"
+        label = "Gen $gen<br/>Score: $(score)×10⁻³<br/>$(l.ep_type)"
+        
+        graph *= "    $node_id[\"$label\"]\n"
+    end
+    
+    graph *= "\n"
+    
+    # Add edges based on evolution strategy
+    for i in 2:length(lineage)
+        current = lineage[i]
+        prev = lineage[i-1]
+        
+        edge_label = ""
+        edge_style = ""
+        
+        # Determine relationship based on EP type
+        if current.ep_type == "EP2"
+            edge_label = "Improvement"
+            edge_style = " --> "
+        elseif current.ep_type == "EP4"
+            edge_label = "Simplification"
+            edge_style = " -.-> "
+        elseif current.ep_type == "EP3"
+            edge_label = "Physics Fix"
+            edge_style = " ==> "
+        else
+            edge_label = "New Structure"
+            edge_style = " ~~> "
+        end
+        
+        graph *= "    G$(prev.generation)$edge_style|$edge_label| G$(current.generation)\n"
+    end
+    
+    # Add styling
+    graph *= "\n"
+    graph *= "    classDef milestone fill:#f96,stroke:#333,stroke-width:4px\n"
+    graph *= "    classDef final fill:#9f6,stroke:#333,stroke-width:4px\n"
+    
+    # Highlight milestones
+    milestones = [1, 3, 6, 8, 10, 13, 17]
+    for m in milestones
+        if m <= length(lineage)
+            graph *= "    class G$m milestone\n"
+        end
+    end
+    graph *= "    class G$(length(lineage)) final\n"
+    
+    graph *= "```\n"
+    
+    return graph
+end
+
+"""
     create_lineage_markdown(lineage::Vector, output_path::String)
 
 Create a markdown document showing the evolution lineage
@@ -175,6 +251,19 @@ function create_lineage_markdown(lineage::Vector, output_path::String)
     println(io_buffer, "")
     println(io_buffer, "This document traces the evolutionary path of the champion model,")
     println(io_buffer, "showing how the mathematical structure evolved across generations.")
+    println(io_buffer, "")
+    
+    # Add evolution graph
+    println(io_buffer, "## Evolution Graph")
+    println(io_buffer, "")
+    println(io_buffer, "The following diagram shows the lineage from Generation 1 (origin) to Generation $(length(lineage)) (final best model).")
+    println(io_buffer, "Edge types indicate the evolution strategy:")
+    println(io_buffer, "- Solid arrow (→): Improvement (EP2)")
+    println(io_buffer, "- Dashed arrow (-→): Simplification (EP4)")
+    println(io_buffer, "- Bold arrow (⇒): Physics Fix (EP3)")
+    println(io_buffer, "- Wavy arrow (~→): New Structure (EP1)")
+    println(io_buffer, "")
+    println(io_buffer, create_evolution_graph(lineage))
     println(io_buffer, "")
     
     # Track major milestones

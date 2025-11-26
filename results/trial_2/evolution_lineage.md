@@ -5,6 +5,71 @@
 This document traces the evolutionary path of the champion model,
 showing how the mathematical structure evolved across generations.
 
+## Evolution Graph
+
+The following diagram shows the lineage from Generation 1 (origin) to Generation 20 (final best model).
+Edge types indicate the evolution strategy:
+- Solid arrow (→): Improvement (EP2)
+- Dashed arrow (-→): Simplification (EP4)
+- Bold arrow (⇒): Physics Fix (EP3)
+- Wavy arrow (~→): New Structure (EP1)
+
+```mermaid
+graph TD
+    G1["Gen 1<br/>Score: 0.457×10⁻³<br/>EP1"]
+    G2["Gen 2<br/>Score: 0.375×10⁻³<br/>EP1"]
+    G3["Gen 3<br/>Score: 0.348×10⁻³<br/>EP1"]
+    G4["Gen 4<br/>Score: 0.349×10⁻³<br/>EP1"]
+    G5["Gen 5<br/>Score: 0.349×10⁻³<br/>EP1"]
+    G6["Gen 6<br/>Score: 0.342×10⁻³<br/>EP1"]
+    G7["Gen 7<br/>Score: 0.339×10⁻³<br/>EP1"]
+    G8["Gen 8<br/>Score: 0.336×10⁻³<br/>EP1"]
+    G9["Gen 9<br/>Score: 0.333×10⁻³<br/>EP1"]
+    G10["Gen 10<br/>Score: 0.335×10⁻³<br/>EP1"]
+    G11["Gen 11<br/>Score: 0.334×10⁻³<br/>EP1"]
+    G12["Gen 12<br/>Score: 0.336×10⁻³<br/>EP1"]
+    G13["Gen 13<br/>Score: 0.33×10⁻³<br/>EP1"]
+    G14["Gen 14<br/>Score: 0.332×10⁻³<br/>EP1"]
+    G15["Gen 15<br/>Score: 0.334×10⁻³<br/>EP1"]
+    G16["Gen 16<br/>Score: 0.33×10⁻³<br/>EP1"]
+    G17["Gen 17<br/>Score: 0.329×10⁻³<br/>EP1"]
+    G18["Gen 18<br/>Score: 0.332×10⁻³<br/>EP1"]
+    G19["Gen 19<br/>Score: 0.331×10⁻³<br/>EP1"]
+    G20["Gen 20<br/>Score: 0.332×10⁻³<br/>EP1"]
+
+    G1 ~~> |New Structure| G2
+    G2 ~~> |New Structure| G3
+    G3 ~~> |New Structure| G4
+    G4 ~~> |New Structure| G5
+    G5 ~~> |New Structure| G6
+    G6 ~~> |New Structure| G7
+    G7 ~~> |New Structure| G8
+    G8 ~~> |New Structure| G9
+    G9 ~~> |New Structure| G10
+    G10 ~~> |New Structure| G11
+    G11 ~~> |New Structure| G12
+    G12 ~~> |New Structure| G13
+    G13 ~~> |New Structure| G14
+    G14 ~~> |New Structure| G15
+    G15 ~~> |New Structure| G16
+    G16 ~~> |New Structure| G17
+    G17 ~~> |New Structure| G18
+    G18 ~~> |New Structure| G19
+    G19 ~~> |New Structure| G20
+
+    classDef milestone fill:#f96,stroke:#333,stroke-width:4px
+    classDef final fill:#9f6,stroke:#333,stroke-width:4px
+    class G1 milestone
+    class G3 milestone
+    class G6 milestone
+    class G8 milestone
+    class G10 milestone
+    class G13 milestone
+    class G17 milestone
+    class G20 final
+```
+
+
 ## Major Milestones
 
 ### Generation 1: Initial exploration

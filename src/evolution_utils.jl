@@ -35,7 +35,7 @@ function save_feedback(generation::Int, evaluated::Vector, filepath::String)
         "timestamp" => string(now()),
         "evaluated_models" => [
             Dict(
-                "id" => i,
+                "id" => model.id,
                 "formula" => model.model,
                 "num_coeffs" => length(model.coeffs),
                 "score" => model.score,
@@ -89,6 +89,7 @@ function load_models(filepath::String)
     models = []
     for m in data.models
         push!(models, (
+            id = get(m, :id, 0),
             model = m.formula,
             num_coeffs = m.num_coeffs,
             reason = get(m, :reason, ""),
@@ -125,6 +126,7 @@ function append_history(generation::Int, evaluated::Vector, filepath::String)
         ),
         "all_models" => [
             Dict(
+                "id" => m.id,
                 "formula" => m.model,
                 "score" => m.score,
                 "coefficients" => m.coeffs,

@@ -416,12 +416,32 @@ julia --project=. benchmark_models.jl [--exp-name experiment_name] [--gen genera
 ### 処理内容
 1.  **データの厳密な読み込み:** `Phase5.load_wake_data` を使用し、進化計算時と全く同じデータ条件を保証します。
 2.  **標準モデルの最適化:** JensenモデルとBastankhahモデルの係数を最適化します。
-3.  **LLMモデルの再最適化:** 発見された最良モデル（Gen 20）に対し、負の値（オフセット項）も許容する**手動チューニングされた範囲**で再最適化を行い、真の性能を引き出します。
+3.  **LLMモデルの再最適化:** 全履歴から自動検出された最良モデル（例: Gen 12）に対し、負の値（オフセット項）も許容する**手動チューニングされた範囲**で再最適化を行い、真の性能を引き出します。
 4.  **サマリー生成:** 詳細な結果をテキストファイルに出力します。
 
 ### 出力
 - `results/{exp_name}/plots/benchmark_profiles_xN.png`: 各モデルの速度プロファイル比較図
 - `results/{exp_name}/plots/benchmark_summary.txt`: **詳細なベンチマーク結果**（数式、係数、データ条件、改善率など）
+
+---
+
+## 8.5. 進化系統の追跡 (Lineage Tracing)
+
+最良モデルがどのように進化してきたか、その系譜を可視化します。
+
+### 使用方法
+
+```bash
+julia --project=. trace_evolution_lineage.jl [--exp-name experiment_name]
+```
+
+### 処理内容
+1.  `history.jsonl` から全世代のモデルデータを読み込みます。
+2.  親子関係（`parent_id`）を追跡し、Global BestモデルとFinal Bestモデルへの進化パスを特定します。
+3.  Mermaid形式のグラフと、数式の変遷表を含むMarkdownレポートを生成します。
+
+### 出力
+- `results/{exp_name}/evolution_lineage.md`: **進化系統レポート**（VS CodeのMarkdownプレビューでグラフを確認可能）
 
 ---
 

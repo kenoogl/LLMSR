@@ -134,6 +134,7 @@ function evaluate_generation(gen::Int, input_file::String, csv_path::String, exp
             
             if θ !== nothing && !isinf(score) && !isnan(score)
                 push!(evaluated, (
+                    id = m.id,
                     model = m.model,
                     score = score,
                     coeffs = θ,

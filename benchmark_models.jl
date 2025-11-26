@@ -19,11 +19,35 @@ function parse_commandline()
             arg_type = String
             default = "default"
         "--gen"
-            help = "Generation number to benchmark (default: 20)"
+            help = "Generation number to benchmark (default: -1 for auto-detect global best)"
             arg_type = Int
-            default = 20
+            default = -1
     end
     return parse_args(s)
+end
+
+function find_global_best_model(exp_name)
+    history_path = joinpath("results", exp_name, "history.jsonl")
+    if !isfile(history_path)
+        error("History file not found: $history_path")
+    end
+    
+    best_score = Inf
+    best_gen = -1
+    
+    for line in eachline(history_path)
+        data = JSON3.read(line)
+        if haskey(data, :best_score) && data.best_score < best_score
+            best_score = data.best_score
+            best_gen = data.generation
+        end
+    end
+    
+    if best_gen == -1
+        error("Could not find any valid generations in history")
+    end
+    
+    return best_gen, best_score
 end
 
 # --- Model Definitions ---
@@ -43,11 +67,10 @@ end
 function bastankhah_wake(x, r, Ct, D, k_star)
     x_D = x / D
     r_D = r / D
-    beta = 0.5 * (1 + sqrt(1 - Ct))
-    epsilon = 0.2 * sqrt(beta) 
-    sigma_D = k_star * x_D + epsilon
-    C = 1 - sqrt(1 - (Ct / (8 * sigma_D^2)))
-    return C * exp(-0.5 * (r_D / sigma_D)^2)
+    sigma_D = k_star * x_D + 0.2 * sqrt(0.5 * (1 - sqrt(1 - Ct)) / (1 - sqrt(1 - Ct))) # Approximation
+    # Standard Bastankhah: sigma/D = k*x/D + epsilon
+    # We will optimize k and epsilon directly
+    return 0.0 # Placeholder, actual logic in optimization wrapper
 end
 
 # --- Optimization Wrapper ---
@@ -96,13 +119,25 @@ end
 function benchmark()
     args = parse_commandline()
     exp_name = args["exp-name"]
-    gen = args["gen"]
+    gen_arg = args["gen"]
+    
+    # Determine generation
+    gen = 0
+    if gen_arg == -1
+        println("🔍 Auto-detecting global best model from history...")
+        best_gen, best_score = find_global_best_model(exp_name)
+        println("   ✓ Found Global Best: Generation $best_gen (Score: $best_score)")
+        gen = best_gen
+    else
+        gen = gen_arg
+    end
+    
+    println("🚀 Starting Benchmark (Experiment: $exp_name, Gen: $gen)...")
     
     base_dir = joinpath("results", exp_name)
     plots_dir = joinpath(base_dir, "plots")
     mkpath(plots_dir)
 
-    println("🚀 Starting Benchmark (Experiment: $exp_name, Gen: $gen)...")
     
     # 1. Load Data
     println("📂 Loading CFD Data (via Phase5)...")

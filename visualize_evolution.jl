@@ -66,25 +66,31 @@ function plot_evolution_curve(history::Vector, output_dir::String="results/plots
         best_scores,
         label="Best Score",
         xlabel="Generation",
-        ylabel="Best Score (MSE)",
+        ylabel="Best Score",
+        yformatter=:scientific,
         title="Evolution of Wake Models",
         marker=:circle,
         linewidth=2,
         color=:blue,
-        legend=:topright,
+        legend=false,
         grid=true,
-        size=(1600, 1000)
+        guidefontsize=14,
+        tickfontsize=12,
+        margin=15Plots.mm,
+        size=(1200, 800)
     )
 
     # Add second y-axis for Mean Score
     plot!(twinx(), generations, mean_scores,
           label="Mean Score",
-          ylabel="Mean Score (MSE)",
+          ylabel="Mean Score",
           marker=:square,
           linewidth=2,
           linestyle=:dash,
           color=:red,
-          legend=:right)
+          legend=false,
+          guidefontsize=14,
+          tickfontsize=12)
     
     # 保存
     mkpath(output_dir)
@@ -125,12 +131,16 @@ function plot_score_distribution(history::Vector, output_dir::String="results/pl
         all_scores,
         xlabel="Generation",
         ylabel="Score (MSE)",
+        yformatter=:scientific,
         title="Score Distribution per Generation",
         legend=false,
         alpha=0.6,
         markersize=3,
         color=:blue,
-        size=(1600, 1000)
+        guidefontsize=14,
+        tickfontsize=12,
+        margin=15Plots.mm,
+        size=(1200, 800)
     )
     
     # Add mean line

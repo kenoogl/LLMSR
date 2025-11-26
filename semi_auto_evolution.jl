@@ -138,7 +138,9 @@ function evaluate_generation(gen::Int, input_file::String, csv_path::String, exp
                     score = score,
                     coeffs = θ,
                     reason = m.reason,
-                    ep_type = m.ep_type
+                    ep_type = m.ep_type,
+                    parent_generation = m.parent_generation,
+                    parent_id = m.parent_id
                 ))
                 @printf "✓ Score: %.6f\n" score
             else

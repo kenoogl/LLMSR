@@ -134,7 +134,8 @@
 - 寄与の小さそうな項を削除
 - 似た項を統合
 
-各式には必ず reason と ep_type を付けてください。
+各式には必ず reason, ep_type, そして改良元の親モデル情報（parent_generation, parent_id）を付けてください。
+EP1の場合は親情報は `null` にしてください。
 
 【出力形式】
 {
@@ -145,7 +146,9 @@
       "formula": "...",
       "num_coeffs": ...,
       "reason": "...",
-      "ep_type": "EP2"
+      "ep_type": "EP2",
+      "parent_generation": N,
+      "parent_id": 1
     },
     ...（計20個）
   ]
@@ -233,6 +236,8 @@
 - `num_coeffs`: 式に含まれる係数の総数
 - `reason`: 英語または日本語で1-2文
 - `ep_type`: 必ず指定（EP1, EP2, EP3, EP4のいずれか）
+- `parent_generation`: 改良元のモデルの世代（EP1はnull）
+- `parent_id`: 改良元のモデルのID（EP1はnull）
 
 ---
 
@@ -246,7 +251,9 @@
   "formula": "a * exp(-b*x) * (1 + c*r^2)^(-d)",
   "num_coeffs": 4,
   "reason": "Gaussian-like profile with polynomial radial decay",
-  "ep_type": "EP1"
+  "ep_type": "EP1",
+  "parent_generation": null,
+  "parent_id": null
 }
 ```
 
@@ -256,7 +263,9 @@
   "formula": "a * exp(-b*x) * (1 + c*r^2)^(-d) * (1 + e*sqrt(k))",
   "num_coeffs": 5,
   "reason": "Added turbulence kinetic energy effect to improve near-wake accuracy",
-  "ep_type": "EP2"
+  "ep_type": "EP2",
+  "parent_generation": 1,
+  "parent_id": 1
 }
 ```
 
@@ -266,7 +275,9 @@
   "formula": "a * x^(-b) * exp(-c*r^2)",
   "num_coeffs": 3,
   "reason": "Simplified power-law decay with Gaussian radial profile",
-  "ep_type": "EP4"
+  "ep_type": "EP4",
+  "parent_generation": 1,
+  "parent_id": 2
 }
 ```
 
@@ -313,7 +324,9 @@ You will be provided with a JSON file content (e.g., `feedback_genX.json`) conta
       "formula": "<Julia形式の式>",
       "num_coeffs": <係数の個数>,
       "reason": "<1-2文の説明>",
-      "ep_type": "<EP1 | EP2 | EP3 | EP4>"
+      "ep_type": "<EP1 | EP2 | EP3 | EP4>",
+      "parent_generation": <親世代番号 | null>,
+      "parent_id": <親ID | null>
     }
   ]
 }

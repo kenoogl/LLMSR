@@ -41,7 +41,9 @@ function save_feedback(generation::Int, evaluated::Vector, filepath::String)
                 "score" => model.score,
                 "coefficients" => model.coeffs,
                 "reason" => get(model, :reason, ""),
-                "ep_type" => get(model, :ep_type, "")
+                "ep_type" => get(model, :ep_type, ""),
+                "parent_generation" => get(model, :parent_generation, nothing),
+                "parent_id" => get(model, :parent_id, nothing)
             )
             for (i, model) in enumerate(sorted)
         ],
@@ -90,7 +92,9 @@ function load_models(filepath::String)
             model = m.formula,
             num_coeffs = m.num_coeffs,
             reason = get(m, :reason, ""),
-            ep_type = get(m, :ep_type, "")
+            ep_type = get(m, :ep_type, ""),
+            parent_generation = get(m, :parent_generation, nothing),
+            parent_id = get(m, :parent_id, nothing)
         ))
     end
     
@@ -125,7 +129,9 @@ function append_history(generation::Int, evaluated::Vector, filepath::String)
                 "score" => m.score,
                 "coefficients" => m.coeffs,
                 "reason" => get(m, :reason, ""),
-                "ep_type" => get(m, :ep_type, "")
+                "ep_type" => get(m, :ep_type, ""),
+                "parent_generation" => get(m, :parent_generation, nothing),
+                "parent_id" => get(m, :parent_id, nothing)
             )
             for m in sorted
         ]

@@ -140,14 +140,134 @@ function simplified_formula(formula::String)
     return join(key_features, ", ")
 end
 
+struct ModelNode
+    generation::Int
+    id::Int
+    formula::String
+    score::Float64
+    ep_type::String
+    reason::String
+    parent_generation::Union{Int, Nothing}
+    parent_id::Union{Int, Nothing}
+end
+
+"""
+    build_genealogy_tree(history::Vector)
+
+Build a dictionary mapping (generation, id) to ModelNode
+"""
+function build_genealogy_tree(history::Vector)
+    tree = Dict{Tuple{Int,Int}, ModelNode}()
+    
+    for h in history
+        if haskey(h, :all_models)
+            # all_models is sorted by score, so index 1 is best
+            for (i, m) in enumerate(h.all_models)
+                # ID is the index in the sorted list (1-based)
+                id = i
+                
+                node = ModelNode(
+                    h.generation,
+                    id,
+                    m.formula,
+                    Float64(m.score),
+                    get(m, :ep_type, ""),
+                    get(m, :reason, ""),
+                    get(m, :parent_generation, nothing),
+                    get(m, :parent_id, nothing)
+                )
+                tree[(h.generation, id)] = node
+            end
+        end
+    end
+    return tree
+end
+
+"""
+    trace_ancestors(tree::Dict, start_node::ModelNode)
+
+Trace back from start_node to the origin
+"""
+function trace_ancestors(tree::Dict, start_node::ModelNode)
+    path = [start_node]
+    current = start_node
+    
+    # Max iterations to prevent infinite loops
+    max_iter = 100
+    iter = 0
+    
+    while current.parent_generation !== nothing && iter < max_iter
+        parent_key = (current.parent_generation, current.parent_id)
+        
+        if haskey(tree, parent_key)
+            parent = tree[parent_key]
+            push!(path, parent)
+            current = parent
+        else
+            @warn "Parent not found: Gen $(current.parent_generation), ID $(current.parent_id)"
+            break
+        end
+        iter += 1
+    end
+    
+    return reverse(path)
+end
+
 """
     trace_lineage(history::Vector)
 
-Trace the lineage of champion models through generations
+Trace the lineage of champion models through generations.
+If parent info is available, traces the true lineage.
+Otherwise, falls back to connecting best models of each generation.
 """
 function trace_lineage(history::Vector)
-    lineage = []
+    if isempty(history)
+        return []
+    end
     
+    # Check if we have parent info in the last generation's best model
+    last_gen = history[end]
+    
+    has_parent_info = false
+    if haskey(last_gen, :all_models) && !isempty(last_gen.all_models)
+        best_model = last_gen.all_models[1]
+        if haskey(best_model, :parent_generation) && best_model.parent_generation !== nothing
+            has_parent_info = true
+        end
+    end
+    
+    if has_parent_info
+        println("   ✓ Parent info detected. Tracing true lineage...")
+        tree = build_genealogy_tree(history)
+        
+        # Find final best model node (Gen N, ID 1)
+        final_key = (last_gen.generation, 1)
+        
+        if haskey(tree, final_key)
+            final_node = tree[final_key]
+            path = trace_ancestors(tree, final_node)
+            
+            # Convert to simple lineage format
+            lineage = []
+            for node in path
+                push!(lineage, (
+                    generation = node.generation,
+                    formula = node.formula,
+                    score = node.score,
+                    reason = node.reason,
+                    ep_type = node.ep_type
+                ))
+            end
+            return lineage
+        else
+            println("   ⚠ Final model node not found in tree. Falling back.")
+        end
+    else
+        println("   ℹ No parent info detected. Using sequential best-model tracing.")
+    end
+    
+    # Fallback / Legacy logic
+    lineage = []
     for h in history
         push!(lineage, (
             generation = h.generation,

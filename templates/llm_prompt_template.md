@@ -28,16 +28,12 @@
    - 例: exp(-b*x), x^(-b) （b > 0）
    - ✗ exp(b*x) は発散するのでNG
 
-2. r 対称性: r 方向は対称であること
-   - 例: r^2, exp(-c*r^2), abs(r)
-   - ✗ r（符号付き）は非対称
 
-3. 非負性: ΔU ≥ 0 であること（速度欠損は負にならない）
+2. 非負性: ΔU ≥ 0 であること（速度欠損は負にならない）
 
-4. 境界条件:
+3. 境界条件:
    - x → ∞ のとき ΔU → 0（後流は回復）
    - r → 0 のとき ΔU は最大（中心軸上で最も減速）
-   - **オフセット項**: 遠方場での微小な速度偏差や境界条件のズレを補正するため、定数項（例: `+ c`）の追加を検討してもよい。
 
 【数学関数】
 使用可能な関数:
@@ -49,16 +45,16 @@
 【EP戦略】
 各モデルには以下のいずれかのEP（Evolutionary Prompt）タイプを指定してください：
 
-- EP1（多様性）: これまでと全く異なる新しい構造（オフセット項は避けること）
+- EP1（多様性）: これまでと全く異なる新しい構造
 - EP2（局所改善）: ベストモデルを微調整・拡張（主構造の改善に集中）
 - EP3（物理性改善）: 物理的制約を満たすよう修正
 - EP4（簡素化）: 複雑なモデルを簡素化
-- EP5（オフセット調整）: 既存の良モデルに定数項や微小な補正項を追加してファインチューニング（最終段階で推奨）
+- EP5（記号的変異）: 数式演算子を直接変異させる（例: `+`→`*`, `exp`→`tanh`）
 - EP6（交叉・組換え）: 2つの異なる良モデルの構造を組み合わせる（例: モデルAの減衰項 × モデルBの半径方向項）
 - EP7（次元解析整合）: 次元の整合性を重視し、物理的に意味のある無次元数の組み合わせのみを使用
 - EP8（極限境界テスト）: x→0, x→∞, r→∞ などの極限挙動が理論と一致することを最優先する
 - EP9（アンサンブル/混合）: 異なる物理メカニズム（近接後流 + 遠方後流など）の重み付き和として表現
-- EP10（記号的変異）: 数式演算子を直接変異させる（例: `+`→`*`, `exp`→`tanh`）
+- EP10（予備）: 将来的な拡張用（現在は使用しない）
 ```
 
 ---
@@ -80,7 +76,8 @@
 - 渦粘性nut依存: ... * (1 + f*nut)
 - 比散逸omega依存: ... * (1 + g*omega)
 - 複合型: 複数の効果を組み合わせ
-- **注意**: この段階ではオフセット項（+ c）は避け、主構造（減衰や広がり）の探索に集中してください。
+- **シードモデルの活用**: 提示された「過去の成功モデル（シード）」を参考に、それらを改良したり、異なるアプローチと組み合わせたりしてください。
+- **注意**: この段階では主構造（減衰や広がり）の探索に集中してください。
 
 各式には以下を付けてください：
 - reason: なぜこの構造を選んだか（1-2文）
@@ -120,34 +117,35 @@
 【生成する式の内訳】
 以下の戦略分布（Gen 2-15用）に従って20個を生成してください：
 
-1. **Exploration (6個)**
-   - EP1 (Diversity): 2個
-   - EP6 (Crossover): 2個
-   - EP10 (Mutation): 2個
+1. **Exploration (10個)**
+   - EP1 (Diversity): 4個
+   - EP5 (Mutation): 2個
+   - EP6 (Crossover): 4個
 
-2. **Exploitation (8個)**
-   - EP2 (Local Improvement): 6個
+2. **Exploitation (6個)**
+   - EP2 (Local Improvement): 4個
    - EP9 (Ensemble): 2個
 
-3. **Constraints (6個)**
+3. **Constraints (4個)**
    - EP3 (Physics): 2個
    - EP4 (Simplification): 1個
-   - EP7 (Dimensional): 2個
-   - EP8 (Boundary): 1個
+   - EP7 (Dimensional): 1個
 
-**注意**: この段階（Gen 2-15）では EP5（オフセット調整）は使用しないでください。
+**注意**: この段階（Gen 6-10）では、既存モデルの微調整よりも、新しい構造の発見（Exploration）を最優先してください。
+
+
 
 【EP2（局所改善）のヒント】
 ベストモデルに対して：
 - 新しい項を追加（乱流項など）
 - 指数の次数を変更
 - 複数の変数を組み合わせ
-- **注意**: 定数項（+ c）の追加はまだ控えてください。まずは主構造を最適化します。
+
 
 【EP3（物理性改善）のヒント】
 もし非物理的なモデルがあれば：
 - x発散を修正: exp(b*x) → exp(-b*x)
-- r非対称を修正: r → r^2
+
 
 【EP4（簡素化）のヒント】
 係数が多すぎるモデルがあれば：
@@ -178,40 +176,35 @@ EP1の場合は親情報は `null` にしてください。
 ---
 
 ### 後期世代（16-20）の特別指示
-
-```
-【後期世代の追加指示】
-
-世代も後半（Gen 16-20）になりました。ここで**EP5（オフセット調整）**を解禁し、Exploitation（徹底的な改善）にシフトします。
-以下の比率に変更してください：
-
-1. **Exploitation (12個)**
-   - EP2 (Local Improvement): 4個
-   - EP5 (Offset Tuning): 6個
-   - EP9 (Ensemble): 2個
-
-2. **Exploration (4個)**
-   - EP1 (Diversity): 2個
-   - EP6 (Crossover): 2個
-
-3. **Constraints (4個)**
-   - EP3/4/7/8 (Mix): 4個
-
-1. **EP5（Offset Tuning）の役割**: 
-   - 既存の良モデル（特にGen 15までのベスト）に対して、最後に `+ d` や `+ d * (1+e*x^2)^(-1)` のような補正項を追加する。
-   - これにより、遠方場での微小なズレを修正し、スコアを極限まで下げる（ファインチューニング）。
-
-2. **EP2（Improvement）の役割**: 
-   - 引き続き主構造の微調整を行う。
-
-3. **EP1（Diversity）の役割**: 
-   - 最後まで新しい可能性を捨てないが、比率は下げる。
-
-4. **最終候補の選定**: 
-   - 論文に載せられるレベルの式を意識
-   - 説明しやすい形にする
-
-```
+ 
+ ```
+ 【後期世代の追加指示】
+ 
+ 世代も後半（Gen 16-20）になりました。ここでExploitation（徹底的な改善）にシフトします。
+ 以下の比率に変更してください：
+ 
+ 1. **Exploitation (12個)**
+    - EP2 (Local Improvement): 8個
+    - EP9 (Ensemble): 4個
+ 
+ 2. **Exploration (4個)**
+    - EP1 (Diversity): 2個
+    - EP6 (Crossover): 2個
+ 
+ 3. **Constraints (4個)**
+    - EP3/4/7/8 (Mix): 4個
+ 
+ 1. **EP2（Improvement）の役割**: 
+    - 既存の良モデルの主構造を徹底的に微調整する。
+    - 係数の最適化だけでなく、項の微修正も含む。
+ 
+ 2. **EP9（Ensemble）の役割**: 
+    - 複数の良モデルを組み合わせて、よりロバストなモデルを作る。
+ 
+ 3. **最終候補の選定**: 
+    - 論文に載せられるレベルの式を意識
+    - 物理的に妥当で、かつ説明しやすい形にする
+ ```
 
 ---
 
@@ -238,8 +231,7 @@ EP1の場合は親情報は `null` にしてください。
 ❌ **誤り**: `exp(b*x)` → xで発散  
 ✅ **正解**: `exp(-b*x)` → xで減衰
 
-❌ **誤り**: `r` → 非対称  
-✅ **正解**: `r^2` または `abs(r)` → 対称
+
 
 ---
 
@@ -315,46 +307,53 @@ EP1の場合は親情報は `null` にしてください。
 
 ---
 
-## 2. Evolution Strategy (Strict Enforcement)
-To avoid stagnation and ensure diverse exploration, you MUST strictly adhere to the following distribution of strategies for **EVERY** generation (except Gen 1):
+## 2. 進化戦略（厳守）
+停滞を防ぎ、多様な探索を確実にするため、**毎世代**（Gen 1を除く）以下の戦略分布を厳守してください：
 
-### Strategy Categories
-1. **Exploration (Diversity)**: EP1, EP6, EP10
-2. **Exploitation (Refinement)**: EP2, EP5, EP9
-3. **Constraints (Physics/Simplicity)**: EP3, EP4, EP7, EP8
+### 戦略カテゴリ
+1. **Exploration (探索)**: EP1, EP5, EP6
+2. **Exploitation (活用)**: EP2, EP9
+3. **Constraints (制約)**: EP3, EP4, EP7, EP8
 
-### Distribution Table (Gen 2-15)
-| Strategy Type | Count | Purpose |
+### 分布表（Gen 2-15）
+| 戦略タイプ | 個数 | 目的 |
 | :--- | :--- | :--- |
-| **Exploration** | **6** | EP1 (2), EP6 (2), EP10 (2) - Try new structures, crossovers, and mutations. |
-| **Exploitation** | **8** | EP2 (6), EP9 (2) - Refine best models and try ensembles. (Avoid EP5 offset tuning here) |
-| **Constraints** | **6** | EP3 (2), EP4 (1), EP7 (2), EP8 (1) - Fix physics, simplify, and check limits. |
+| **Exploration** | **10** | EP1 (4), EP5 (2), EP6 (4) - 新しい構造、変異、交叉を試す。 |
+| **Exploitation** | **6** | EP2 (4), EP9 (2) - ベストモデルの改良とアンサンブル。 |
+| **Constraints** | **4** | EP3 (2), EP4 (1), EP7 (1) - 物理性の修正、簡素化、次元整合。 |
 
-**CRITICAL:** Do NOT focus solely on EP2. You must maintain this balance to ensure robust evolution.
+**重要:** EP2だけに集中しないでください。堅牢な進化のためにこのバランスを維持する必要があります。
 
-### Distribution Table (Gen 16-20: Fine-tuning)
-| Strategy Type | Count | Purpose |
+### 分布表（Gen 16-20: 収束・微調整）
+| 戦略タイプ | 個数 | 目的 |
 | :--- | :--- | :--- |
-| **Exploitation** | **12** | EP2 (4), EP5 (6), EP9 (2) - Aggressive tuning with offsets and ensembles. |
-| **Exploration** | **4** | EP1 (2), EP6 (2) - Keep looking for breakthroughs. |
-| **Constraints** | **4** | EP3/4/7/8 (Mix) - Ensure final models are physically sound. |
+| **Exploitation** | **12** | EP2 (8), EP9 (4) - 徹底的な微調整とアンサンブル。 |
+| **Exploration** | **4** | EP1 (2), EP6 (2) - ブレイクスルーの可能性を残す。 |
+| **Constraints** | **4** | EP3/4/7/8 (Mix) - 物理的妥当性の確保。 |
 
-## 3. Input Data
+**Gen 16-20（収束と洗練）**
+- **EP4 (簡素化)**: 係数が小さい項や影響の少ない項を削除。
+- **EP6 (交叉)**: 性能の良い2つの親モデルの特徴を組み合わせる。
+- **EP7 (次元解析)**: 次元の整合性を確保するよう項を調整（例: x/D）。
+- **推奨戦略**: EP2, EP3, EP9。
+- **禁止事項**: オフセット調整（定数項の追加）。
 
-You will be provided with a JSON file content (e.g., `feedback_genX.json`) containing:
-- `generation`: Current generation number $N$.
-- `best_model`: The best performing model of generation $N$.
-- `statistics`: Population statistics.
-- `evaluated_models`: List of all models in generation $N$ with their scores and reasons.
+## 3. 入力データ
 
-## 4. Task
+提供されるJSONファイル（例: `feedback_genX.json`）には以下が含まれます：
+- `generation`: 現在の世代番号 $N$。
+- `best_model`: 世代 $N$ のベストモデル。
+- `statistics`: 集団の統計情報。
+- `evaluated_models`: 世代 $N$ の全モデルリスト（スコアと理由付き）。
 
-1.  **Analyze** the feedback from generation $N$. Identify which structures worked best.
-2.  **Determine** the strategy for generation $N+1$ based on the "Evolution Strategy Phases" table above.
-3.  **Generate** 20 new model formulas for generation $N+1$.
-4.  **Output** the result in the specified JSON format.
+## 4. タスク
 
-## 5. Output Format
+1.  **分析**: 世代 $N$ のフィードバックを分析し、どの構造が最も良かったか特定する。
+2.  **決定**: 上記の「進化戦略」テーブルに基づいて、世代 $N+1$ の戦略を決定する。
+3.  **生成**: 世代 $N+1$ 用に新しいモデル式を20個生成する。
+4.  **出力**: 指定されたJSON形式で結果を出力する。
+
+## 5. 出力フォーマット
 
 必ず以下の形式で出力してください：
 

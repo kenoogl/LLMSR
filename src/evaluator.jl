@@ -119,24 +119,51 @@ function physical_penalty(ex, θ, x, r, k, omega, nut, deltaU)
 
     ŷ = eval_model(ex, θ, x, r, k, omega, nut)
 
-    # P1: x方向の減衰性違反（粗い例）
-    P1 = mean(max.(diff(ŷ), 0))  # ΔU が増加していたらペナルティ
+    # P1: 中心軸上の単調回復 (Monotonic Recovery)
+    # r=0 において、xが増加するにつれて ΔU が減少（回復）すべき
+    # 簡易チェック: xの最小値と最大値での値を比較
+    # x_min, x_max での値を計算するために eval_model を再利用するのはコストが高いので
+    # データセット内の x の並びを利用して、差分が正（増えている）の割合をペナルティとする
+    # ただし、データはソートされていない可能性があるため、簡易的に ŷ の平均勾配を見る
+    # ここではより厳密に、仮想的な点での評価を行う
+    
+    # 仮想的な x 点列 (r=0)
+    x_test = [5.0, 10.0, 20.0, 50.0]
+    r_test = zeros(length(x_test))
+    # k, omega, nut は平均値を使用
+    k_mean = mean(k)
+    omega_mean = mean(omega)
+    nut_mean = mean(nut)
+    
+    y_recovery = eval_model(ex, θ, x_test, r_test, fill(k_mean, 4), fill(omega_mean, 4), fill(nut_mean, 4))
+    
+    # 差分をとる (y[i+1] - y[i])。これが正なら（下流で増えているなら）ペナルティ
+    diffs = diff(y_recovery)
+    P1 = sum(max.(diffs, 0.0)) * 10.0 # 増加量に比例したペナルティ
 
-    # P2: r方向対称性
-    # r>0 と r<0 の差を簡易評価
-    P2 = mean(abs.(ŷ[r .> 0] .- ŷ[r .< 0]))  # 厳密ではないが概念的
-
-    # P3: ΔU の非物理範囲
+    # P3: ΔU の非物理範囲 (0 < ΔU < 1)
     P3 = mean((ŷ .< 0) .* abs.(ŷ) .+ (ŷ .> 1) .* abs.(ŷ .- 1))
 
-    # P4: nutとの整合（nut 大→拡散大）
-    # nut が大きいのに ΔU が急激に変化 → ペナルティ
-    P4 = mean(abs.(nut .* diff(ŷ)))
+    # P4: 無限遠でのゼロ収束 (Asymptotic Decay)
+    # x -> ∞, r -> ∞ で 0 になるべき
+    x_inf = [1000.0]
+    r_inf = [100.0]
+    y_inf_x = eval_model(ex, θ, x_inf, [0.0], [k_mean], [omega_mean], [nut_mean])
+    y_inf_r = eval_model(ex, θ, [10.0], r_inf, [k_mean], [omega_mean], [nut_mean])
+    
+    # 閾値 1e-3 を超えた分をペナルティ
+    P4 = max(abs(y_inf_x[1]) - 1e-3, 0.0) + max(abs(y_inf_r[1]) - 1e-3, 0.0)
+
+    # P5: 振幅係数(a)の符号チェック
+    P5 = (θ[1] < 0) ? 1.0 : 0.0
 
     # 重み
-    λ1, λ2, λ3, λ4 = 1.0, 0.5, 2.0, 0.2
+    λ1 = 5.0   # 単調回復
+    λ3 = 10.0  # 範囲
+    λ4 = 50.0  # ゼロ収束 (定数項排除のため強めに)
+    λ5 = 100.0 # 負の振幅
 
-    P = λ1*P1 + λ2*P2 + λ3*P3 + λ4*P4
+    P = λ1*P1 + λ3*P3 + λ4*P4 + λ5*P5
     return P
 end
 

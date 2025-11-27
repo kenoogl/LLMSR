@@ -36,14 +36,14 @@ julia --project=. main.jl
 
 ### ステップ1: 初期集団の生成（世代0）
 
-```bash
-julia --project=. semi_auto_evolution.jl --generate-initial --size 20 [--exp-name experiment_name]
-```
-
-**出力**:
-**出力**:
-- `results/{exp_name}/feedback_gen0.json` が生成される
-- このファイルには、Geminiへの指示が含まれている
+1.  **初期集団の生成**:
+    ```bash
+    julia --project=. semi_auto_evolution.jl --generate-initial --size 20 [--exp-name experiment_name]
+    ```
+    - `results/{exp_name}/feedback_gen0.json` が生成されます。
+    - このファイルには、Geminiへの指示が含まれています。
+    - `seeds.json` が存在する場合、そこからシードモデルが自動的にロードされ、LLMに過去の成功モデルが提供されます。
+    - 別のシードファイルを使用するには: `--seeds-file path/to/seeds.json` を指定します。
 
 **内容確認**:
 ```bash
@@ -107,6 +107,8 @@ julia --project=. semi_auto_evolution.jl --evaluate 1 [--exp-name experiment_nam
    ✓ Loaded 20 models
 
 ⚙️  Evaluating models...
+- **Stagnation**: If scores plateau, increase mutation rate or force EP1 (New Structures).
+- **Overfitting**: If validation score worsens, increase physical penalty weight or force EP4 (Simplification).
    [ 1/20] a * exp(-b*x) * exp(-c*r^2)...              ✓ Score: 0.001234
    [ 2/20] a * x^(-b) * (1 + c*r^2)^(-d)...            ✓ Score: 0.002145
    ...

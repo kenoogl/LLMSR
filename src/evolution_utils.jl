@@ -52,6 +52,15 @@ function save_feedback(generation::Int, evaluated::Vector, filepath::String)
             "score" => sorted[1].score,
             "coefficients" => sorted[1].coeffs
         ),
+        "diverse_elites" => [
+            Dict(
+                "id" => m.id,
+                "formula" => m.model,
+                "score" => m.score,
+                "coefficients" => m.coeffs
+            )
+            for m in select_diverse_elites(evaluated, 3; similarity_threshold=0.8)
+        ],
         "statistics" => Dict(
             "best_score" => sorted[1].score,
             "worst_score" => sorted[end].score,
@@ -260,13 +269,28 @@ end
 
 
 """
-    generate_initial_feedback(size::Int, filepath::String)
+    generate_initial_feedback(size::Int, filepath::String; seeds::Vector{Dict}=Dict[])
 
 初期集団（世代0）用のフィードバックを生成
-
-ランダムなサンプル式を提示してLLMに多様な初期集団を生成させる
+シードモデルがある場合は、それらを「過去の成功例」として提示する。
 """
-function generate_initial_feedback(size::Int, filepath::String)
+function generate_initial_feedback(size::Int, filepath::String; seeds::Vector=Dict[])
+    
+    seed_text = ""
+    if !isempty(seeds)
+        seed_text = """
+        
+        【過去の成功モデル（シード）】
+        以下のモデルは過去の実験で高い性能を示しました。これらを初期集団の一部として含めるか、これらを改良したモデルを生成してください。
+        
+        """
+        for (i, seed) in enumerate(seeds)
+            seed_formula = get(seed, :formula, get(seed, "formula", ""))
+            seed_score = get(seed, :score, get(seed, "score", 0.0))
+            seed_text *= "- Seed $i: $(seed_formula) (Score: $(seed_score))\n"
+        end
+    end
+
     feedback = Dict(
         "generation" => 0,
         "timestamp" => string(now()),
@@ -298,6 +322,7 @@ function generate_initial_feedback(size::Int, filepath::String)
         - べき乗型: x^(-b) * (1 + c*r^2)^(-d)
         - 乱流項含む: ... * (1 + e*k) または ... * (1 + e*nut)
         - 複合型: 複数の効果を組み合わせ
+        $(seed_text)
         
         【出力形式】
         以下のJSON形式で出力してください：
@@ -347,6 +372,71 @@ function format_model_for_display(model::NamedTuple)
     end
     if haskey(model, :ep_type) && !isempty(model.ep_type)
         println("EP Type: $(model.ep_type)")
+    end
+end
+
+"""
+    load_seeds(filepath::String)
+
+シードモデルをJSONファイルから読み込む。
+ファイルが存在しない場合は空の配列を返す。
+"""
+function load_seeds(filepath::String)
+    if !isfile(filepath)
+        @warn "Seeds file not found: $filepath. Starting with empty seeds."
+        return Dict[]
+    end
+    
+    try
+        data = JSON3.read(read(filepath, String))
+        # JSON3.Array -> Vector{Dict} 変換
+        return [Dict(pairs(item)) for item in data]
+    catch e
+        @error "Failed to load seeds from $filepath" e
+        return Dict[]
+    end
+end
+
+"""
+    update_seeds(filepath::String, new_model::Dict)
+
+新しい高性能モデルをシードファイルに追加・更新する。
+同じ式が既に存在する場合はスコアが良い方を保持する。
+"""
+function update_seeds(filepath::String, new_model::Dict)
+    seeds = load_seeds(filepath)
+    
+    # 既存の式と比較
+    existing_idx = findfirst(s -> replace(s["formula"], " " => "") == replace(new_model["formula"], " " => ""), seeds)
+    
+    updated = false
+    if existing_idx !== nothing
+        # 既存の方がスコアが悪い（大きい）場合のみ更新
+        if new_model["score"] < seeds[existing_idx]["score"]
+            seeds[existing_idx] = new_model
+            updated = true
+            @info "Updated existing seed with better score."
+        end
+    else
+        # 新規追加
+        push!(seeds, new_model)
+        updated = true
+        @info "Added new seed model."
+    end
+    
+    if updated
+        # スコア順にソートして保存
+        sort!(seeds, by=x->x["score"])
+        
+        # 上位10個程度に絞る（オプション）
+        if length(seeds) > 10
+            seeds = seeds[1:10]
+        end
+        
+        open(filepath, "w") do io
+            JSON3.write(io, seeds)
+        end
+        @info "Seeds file updated: $filepath"
     end
 end
 

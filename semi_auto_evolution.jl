@@ -56,6 +56,10 @@ function parse_commandline()
             help = "Experiment name (creates results/{exp_name}/)"
             arg_type = String
             default = "default"
+        "--seeds-file"
+            help = "Path to seeds JSON file"
+            arg_type = String
+            default = "seeds.json"
     end
     
     return parse_args(s)
@@ -63,11 +67,11 @@ end
 
 
 """
-    generate_initial(size::Int, exp_name::String)
+    generate_initial(size::Int, exp_name::String, seeds_file::String)
 
 初期集団（世代0）のフィードバックを生成
 """
-function generate_initial(size::Int, exp_name::String)
+function generate_initial(size::Int, exp_name::String, seeds_file::String)
     println("\n" * "="^70)
     println("🌱 Generating Initial Population Feedback (Generation 0)")
     println("="^70)
@@ -76,10 +80,18 @@ function generate_initial(size::Int, exp_name::String)
     base_dir = joinpath("results", exp_name)
     mkpath(base_dir)
     mkpath(joinpath(base_dir, "plots"))
+
+    # シードモデルの読み込み
+    seeds = EvolutionUtils.load_seeds(seeds_file)
+    if !isempty(seeds)
+        println("   ✓ Loaded $(length(seeds)) seed models from $seeds_file")
+    else
+        println("   ℹ️  No seeds loaded (starting fresh)")
+    end
     
     # 初期フィードバック生成
     feedback_path = joinpath(base_dir, "feedback_gen0.json")
-    EvolutionUtils.generate_initial_feedback(size, feedback_path)
+    EvolutionUtils.generate_initial_feedback(size, feedback_path; seeds=seeds)
     
     println("\n✅ Initial feedback generated!")
     println("\n📋 Next steps:")
@@ -89,7 +101,6 @@ function generate_initial(size::Int, exp_name::String)
     println("   4. Run: julia --project=. semi_auto_evolution.jl --evaluate 1 --input $(joinpath(base_dir, "models_gen1.json")) --exp-name $exp_name")
     println()
 end
-
 
 """
     evaluate_generation(gen::Int, input_file::String, csv_path::String, exp_name::String)
@@ -128,7 +139,7 @@ function evaluate_generation(gen::Int, input_file::String, csv_path::String, exp
             score, θ = Phase5.evaluate_formula(
                 m.model;
                 num_coeffs=m.num_coeffs,
-                with_penalty=false,
+                with_penalty=true,
                 csv_path=csv_path
             )
             
@@ -206,14 +217,13 @@ function evaluate_generation(gen::Int, input_file::String, csv_path::String, exp
     println()
 end
 
-
 # メイン処理
 function main()
     args = parse_commandline()
     
     if args["generate-initial"]
         # 初期集団生成
-        generate_initial(args["size"], args["exp-name"])
+        generate_initial(args["size"], args["exp-name"], args["seeds-file"])
         
     elseif args["evaluate"] > 0
         # 世代の評価

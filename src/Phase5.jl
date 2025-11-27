@@ -104,14 +104,14 @@ function evaluate_formula(model_str::String;
         
         # 複雑性ペナルティ f3 の計算
         n0 = Evaluator.calculate_complexity(ex)
-        if n0 <= 10
+        if n0 <= 50
             f3 = sqrt(n0 + 1000) / sqrt(1001)
         else
             f3 = sqrt(n0^2 + 910) / sqrt(1001)
         end
         
-        # 最終スコア = MSE * f3
-        # (f1=MSE, f2=0, f4=1 と仮定)
+        # 最終スコア = (MSE + Penalty) * f3
+        # score には既に MSE (+ Penalty) が含まれている
         final_score = score * f3
         
         return (final_score, θ_opt)

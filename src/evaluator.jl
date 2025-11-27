@@ -6,7 +6,8 @@ using Printf
 export parse_model_expression,
        eval_model,
        mse_eval,
-       physical_penalty
+       physical_penalty,
+       calculate_complexity
 
 """
     parse_model_expression(model_str::String)
@@ -137,6 +138,28 @@ function physical_penalty(ex, θ, x, r, k, omega, nut, deltaU)
 
     P = λ1*P1 + λ2*P2 + λ3*P3 + λ4*P4
     return P
+end
+
+"""
+    calculate_complexity(ex)
+
+数式 ex の複雑性（ノード数 n0）を計算する。
+再帰的に式木を探索し、演算子、変数、定数の総数をカウントする。
+"""
+function calculate_complexity(ex)
+    if isa(ex, Expr)
+        # 関数呼び出しや演算子の場合、引数の複雑性の和 + 1 (自分自身)
+        return 1 + sum(calculate_complexity(arg) for arg in ex.args)
+    elseif isa(ex, Symbol)
+        # 変数や係数シンボル
+        return 1
+    elseif isa(ex, Number)
+        # 数値リテラル
+        return 1
+    else
+        # その他
+        return 1
+    end
 end
 
 end # module

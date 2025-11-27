@@ -54,6 +54,11 @@
 - EP3（物理性改善）: 物理的制約を満たすよう修正
 - EP4（簡素化）: 複雑なモデルを簡素化
 - EP5（オフセット調整）: 既存の良モデルに定数項や微小な補正項を追加してファインチューニング（最終段階で推奨）
+- EP6（交叉・組換え）: 2つの異なる良モデルの構造を組み合わせる（例: モデルAの減衰項 × モデルBの半径方向項）
+- EP7（次元解析整合）: 次元の整合性を重視し、物理的に意味のある無次元数の組み合わせのみを使用
+- EP8（極限境界テスト）: x→0, x→∞, r→∞ などの極限挙動が理論と一致することを最優先する
+- EP9（アンサンブル/混合）: 異なる物理メカニズム（近接後流 + 遠方後流など）の重み付き和として表現
+- EP10（記号的変異）: 数式演算子を直接変異させる（例: `+`→`*`, `exp`→`tanh`）
 ```
 
 ---
@@ -113,12 +118,24 @@
 - 改善の方向性: {提案}
 
 【生成する式の内訳】
-以下の戦略で20個を生成してください：
-- EP1（多様性）: 4個 - 全く新しい構造を試す
-- EP2（局所改善）: 12個 - ベストモデルを改良・拡張（オフセット項はまだ追加しない）
-- EP3（物理性改善）: 2個 - 物理的制約を満たすよう修正
-- EP4（簡素化）: 2個 - 複雑すぎるモデルを簡素化
-- EP5（オフセット調整）: 0個 - この段階では使用しない
+以下の戦略分布（Gen 2-15用）に従って20個を生成してください：
+
+1. **Exploration (6個)**
+   - EP1 (Diversity): 2個
+   - EP6 (Crossover): 2個
+   - EP10 (Mutation): 2個
+
+2. **Exploitation (8個)**
+   - EP2 (Local Improvement): 6個
+   - EP9 (Ensemble): 2個
+
+3. **Constraints (6個)**
+   - EP3 (Physics): 2個
+   - EP4 (Simplification): 1個
+   - EP7 (Dimensional): 2個
+   - EP8 (Boundary): 1個
+
+**注意**: この段階（Gen 2-15）では EP5（オフセット調整）は使用しないでください。
 
 【EP2（局所改善）のヒント】
 ベストモデルに対して：
@@ -165,13 +182,20 @@ EP1の場合は親情報は `null` にしてください。
 ```
 【後期世代の追加指示】
 
-世代も後半（Gen 16-20）になりました。ここで**EP5（オフセット調整）**を解禁します。
+世代も後半（Gen 16-20）になりました。ここで**EP5（オフセット調整）**を解禁し、Exploitation（徹底的な改善）にシフトします。
 以下の比率に変更してください：
 
-- EP2（局所改善）: 8個
-- EP5（オフセット調整）: 8個
-- EP1（多様性）: 2個
-- EP4（簡素化）: 2個
+1. **Exploitation (12個)**
+   - EP2 (Local Improvement): 4個
+   - EP5 (Offset Tuning): 6個
+   - EP9 (Ensemble): 2個
+
+2. **Exploration (4個)**
+   - EP1 (Diversity): 2個
+   - EP6 (Crossover): 2個
+
+3. **Constraints (4個)**
+   - EP3/4/7/8 (Mix): 4個
 
 1. **EP5（Offset Tuning）の役割**: 
    - 既存の良モデル（特にGen 15までのベスト）に対して、最後に `+ d` や `+ d * (1+e*x^2)^(-1)` のような補正項を追加する。
@@ -292,17 +316,28 @@ EP1の場合は親情報は `null` にしてください。
 ---
 
 ## 2. Evolution Strategy (Strict Enforcement)
-
 To avoid stagnation and ensure diverse exploration, you MUST strictly adhere to the following distribution of strategies for **EVERY** generation (except Gen 1):
 
+### Strategy Categories
+1. **Exploration (Diversity)**: EP1, EP6, EP10
+2. **Exploitation (Refinement)**: EP2, EP5, EP9
+3. **Constraints (Physics/Simplicity)**: EP3, EP4, EP7, EP8
+
+### Distribution Table (Gen 2-15)
 | Strategy Type | Count | Purpose |
 | :--- | :--- | :--- |
-| **EP1 (Diversity)** | **4** | Explore completely NEW mathematical structures or variable combinations not seen in the top models. |
-| **EP2 (Improvement)** | **10** | Refine and extend the current best models (e.g., adding terms, adjusting powers). |
-| **EP3 (Physics)** | **4** | Fix physical violations (e.g., ensure decay at infinity, symmetry) or test theoretical constraints. |
-| **EP4 (Simplification)** | **2** | Simplify complex models (reduce coefficient count) while maintaining accuracy. |
+| **Exploration** | **6** | EP1 (2), EP6 (2), EP10 (2) - Try new structures, crossovers, and mutations. |
+| **Exploitation** | **8** | EP2 (6), EP9 (2) - Refine best models and try ensembles. (Avoid EP5 offset tuning here) |
+| **Constraints** | **6** | EP3 (2), EP4 (1), EP7 (2), EP8 (1) - Fix physics, simplify, and check limits. |
 
-**CRITICAL:** Do NOT focus solely on EP2. You must generate exactly 4 EP1s, 4 EP3s, and 2 EP4s to maintain population diversity.
+**CRITICAL:** Do NOT focus solely on EP2. You must maintain this balance to ensure robust evolution.
+
+### Distribution Table (Gen 16-20: Fine-tuning)
+| Strategy Type | Count | Purpose |
+| :--- | :--- | :--- |
+| **Exploitation** | **12** | EP2 (4), EP5 (6), EP9 (2) - Aggressive tuning with offsets and ensembles. |
+| **Exploration** | **4** | EP1 (2), EP6 (2) - Keep looking for breakthroughs. |
+| **Constraints** | **4** | EP3/4/7/8 (Mix) - Ensure final models are physically sound. |
 
 ## 3. Input Data
 

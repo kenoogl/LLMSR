@@ -1,65 +1,65 @@
-# Trial 4 Final Report: Phased Evolutionary Search
+# Trial 4 最終レポート: 段階的進化探索
 
-## Executive Summary
+## エグゼクティブサマリー
 
-Trial 4 implemented a **phased evolutionary strategy** to discover wake models, separating structural exploration (Gen 0-15) from fine-tuning (Gen 16-20).
+Trial 4 では、後流モデルを発見するために、構造探索（Gen 0-15）とファインチューニング（Gen 16-20）を分離した**段階的進化戦略**を実装しました。
 
-*   **Best Model Found**: Generation 4, ID 10
-*   **Best Score (MSE)**: **0.000455**
-*   **Baseline (Jensen)**: 0.000480
-*   **Improvement**: ~5.2% over Jensen
+*   **発見されたベストモデル**: 第4世代, ID 10
+*   **ベストスコア (MSE)**: **0.000455**
+*   **ベースライン (Jensen)**: 0.000480
+*   **改善率**: Jensenと比較して約5.2%向上
 
-Contrary to expectations, the **Offset Tuning (EP5)** phase in Generations 16-20 did *not* improve upon the best structural model found in the early exploration phase. The best performance was achieved by a pure structural modification in Generation 4, highlighting the importance of the core decay formulation over additive corrections for this dataset.
+予想に反して、第16世代から第20世代の**オフセットチューニング (EP5)** フェーズは、初期の探索フェーズで発見されたベスト構造モデルを改善しませんでした。最高の性能は第4世代の純粋な構造変更によって達成され、このデータセットにおいては、加法的な補正項よりも核となる減衰式の定式化が重要であることが浮き彫りになりました。
 
-## Best Model Details
+## ベストモデルの詳細
 
-**Formula**:
+**数式**:
 ```math
 u_{def} = a \cdot (1 + b \cdot \sqrt{x})^{-2.5} \cdot (1 + c \cdot r^2 + d \cdot r^4)^{-1} \cdot (1 + e \cdot x)
 ```
 
-**Coefficients**:
+**係数**:
 ```julia
 [81.8311, 53.4407, 3.4980, 4.0883, 78.0886]
 ```
 
-**Key Features**:
-1.  **$\sqrt{x}$ Decay**: Uses `sqrt(x)` as the scaling variable instead of linear `x`.
-2.  **Higher Decay Power**: The exponent is `-2.5` (vs standard `-2`), indicating a faster initial decay that slows down differently than the standard inverse square law.
-3.  **Polynomial Radial Profile**: Uses `(1 + cr^2 + dr^4)^-1`, allowing for a more complex radial shape (likely flatter top or different tail) than a simple Gaussian.
-4.  **Linear Correction**: The `(1 + ex)` term acts as a global scaling factor that evolves linearly downstream.
+**主な特徴**:
+1.  **$\sqrt{x}$ 減衰**: 線形の `x` ではなく `sqrt(x)` をスケーリング変数として使用しています。
+2.  **高い減衰べき乗**: 指数が `-2.5`（標準的な `-2` に対して）となっており、標準的な逆二乗則とは異なる、初期の急速な減衰とその後の緩やかな変化を示しています。
+3.  **多項式半径方向プロファイル**: `(1 + cr^2 + dr^4)^-1` を使用しており、単純なガウス分布よりも複雑な半径方向の形状（平坦な頂部や異なる裾の形状など）を表現可能です。
+4.  **線形補正**: `(1 + ex)` 項が、下流に向かって線形に変化する大域的なスケーリング係数として機能しています。
 
-## Evolutionary Dynamics Analysis
+## 進化ダイナミクス分析
 
-### Phase 1: Exploration (Gen 0-15)
-*   **Rapid Discovery**: The best model was found very early (Gen 4).
-*   **Structural Diversity**: The strategy successfully explored various decay forms (`x`, `sqrt(x)`, `exp(x)`). The `sqrt(x)` branch consistently outperformed others.
-*   **Physical Parameters**: Integration of `k` (TKE), `nut` (Eddy Viscosity), and `omega` in Gen 6-15 yielded interesting models but none surpassed the pure geometric `sqrt(x)` model. This suggests that for this specific dataset (LES data), the geometric constraints are more dominant than the available local physical parameters for predicting velocity deficit.
+### フェーズ 1: 探索 (Gen 0-15)
+*   **早期の発見**: ベストモデルは非常に早い段階（Gen 4）で発見されました。
+*   **構造的多様性**: この戦略は、様々な減衰形式（`x`, `sqrt(x)`, `exp(x)`）の探索に成功しました。`sqrt(x)` の系統が一貫して他を上回りました。
+*   **物理パラメータ**: Gen 6-15 で `k` (乱流運動エネルギー), `nut` (渦粘性係数), `omega` を統合したモデルは興味深いものでしたが、純粋な幾何学的 `sqrt(x)` モデルを超えるものはありませんでした。これは、この特定のデータセット（LESデータ）においては、速度欠損の予測に関して、局所的な物理パラメータよりも幾何学的な制約の方が支配的であることを示唆しています。
 
-### Phase 2: Fine-tuning (Gen 16-20)
-*   **Strategy**: EP5 (Offset Tuning) was introduced to add additive terms (`+ offset`) to the best structures.
-*   **Outcome**: This phase failed to improve the score. The best offset model achieved ~0.00099, significantly worse than the Gen 4 structural model (0.000455).
-*   **Analysis**: The additive offsets likely introduced overfitting or unphysical biases that the MSE metric penalized on the validation set (or the optimization landscape became too complex/flat for DE to solve efficiently). The "constant offset" hypothesis (that a simple bias correction would fix the remaining error) was proven incorrect for this physics-driven problem.
+### フェーズ 2: ファインチューニング (Gen 16-20)
+*   **戦略**: ベストな構造に加法的な項（`+ offset`）を追加する EP5（オフセットチューニング）を導入しました。
+*   **結果**: このフェーズではスコアを改善できませんでした。ベストなオフセットモデルのスコアは約 0.00099 であり、Gen 4 の構造モデル (0.000455) よりも大幅に悪化しました。
+*   **分析**: 加法的なオフセットは、検証セットにおいてMSEメトリクスがペナルティを与えるような過学習や非物理的なバイアスを導入した可能性があります（あるいは、最適化の地形がDEにとって複雑または平坦になりすぎた可能性があります）。「定数オフセット（単純なバイアス補正）が残差を修正する」という仮説は、この物理駆動の問題に対しては正しくないことが証明されました。
 
-## Comparison with Baselines
+## ベースラインとの比較
 
-| Model | MSE Score | Notes |
+| モデル | MSE スコア | 備考 |
 |-------|-----------|-------|
-| **Trial 4 Best (Gen 4)** | **0.000455** | **Sqrt(x) decay + Poly(r)** |
-| Jensen (Baseline) | 0.000480 | Standard industry model |
-| Gaussian (Baseline) | 0.001553 | Standard Gaussian profile |
-| Trial 3 Best | 0.000116 | (Previous best, likely overfit or different split?) |
+| **Trial 4 ベスト (Gen 4)** | **0.000455** | **Sqrt(x) 減衰 + Poly(r)** |
+| Jensen (ベースライン) | 0.000480 | 業界標準モデル |
+| Gaussian (ベースライン) | 0.001553 | 標準的なガウスプロファイル |
+| Trial 3 ベスト | 0.000116 | (以前のベスト。過学習または異なる分割の可能性あり？) |
 
-*Note: The Trial 3 best score (0.000116) was significantly lower. Trial 4's inability to replicate this suggests either:*
-1.  *Trial 3 found a "unicorn" structure that Trial 4 missed.*
-2.  *Trial 3's score was an outlier or benefited from a specific random seed/initialization.*
-3.  *The `sqrt(x)` branch, while robust, hit a local optimum that is higher than Trial 3's best.*
+*注: Trial 3 のベストスコア (0.000116) は著しく低い値でした。Trial 4 でこれを再現できなかったことは、以下のいずれかを示唆しています：*
+1.  *Trial 3 は Trial 4 が見逃した「ユニコーン（特異的に優れた）」構造を発見していた。*
+2.  *Trial 3 のスコアは外れ値であったか、特定のランダムシード/初期化の恩恵を受けていた。*
+3.  *`sqrt(x)` の系統は頑健ではあるが、Trial 3 のベストよりも高い局所解に陥っている。*
 
-## Conclusion & Recommendations
+## 結論と推奨事項
 
-Trial 4 demonstrated that **structural innovation** (changing the decay law to `sqrt(x)`) is more effective than **additive corrections** (offsets) or **complex physical parameter couplings** for this specific wake modeling task.
+Trial 4 は、この特定の後流モデリングタスクにおいて、**構造的革新**（減衰則を `sqrt(x)` に変更するなど）が、**加法的な補正**（オフセット）や**複雑な物理パラメータ結合**よりも効果的であることを実証しました。
 
-**Future Directions**:
-1.  **Revisit Trial 3**: Analyze the Trial 3 best model structure again. If it was truly superior, we should seed Trial 5 with it.
-2.  **Hybrid Decay**: Combine `x` and `sqrt(x)` decay terms more explicitly.
-3.  **Multi-Objective**: The single MSE metric might be hiding trade-offs. Future trials could consider near-wake vs. far-wake accuracy separately.
+**今後の方向性**:
+1.  **Trial 3 の再検討**: Trial 3 のベストモデル構造を再分析します。もしそれが真に優れているなら、Trial 5 の初期値として採用すべきです。
+2.  **ハイブリッド減衰**: `x` と `sqrt(x)` の減衰項をより明示的に組み合わせることを検討します。
+3.  **多目的最適化**: 単一の MSE メトリクスはトレードオフを隠している可能性があります。将来のトライアルでは、近接後流と遠方後流の精度を個別に考慮することを検討すべきです。

@@ -14,7 +14,7 @@ using Statistics
 using Dates
 
 export save_feedback, load_models, append_history, calculate_diversity, 
-       generate_initial_feedback, format_model_for_display
+       generate_initial_feedback, format_model_for_display, select_diverse_elites
 
 """
     save_feedback(generation::Int, evaluated::Vector, filepath::String)
@@ -148,6 +148,100 @@ function append_history(generation::Int, evaluated::Vector, filepath::String)
     @info "History updated: Generation $generation"
 end
 
+
+"""
+    levenshtein(s1, s2)
+
+2つの文字列間のレーベンシュタイン距離を計算する。
+"""
+function levenshtein(s1::AbstractString, s2::AbstractString)
+    a, b = s1, s2
+    if length(a) < length(b)
+        a, b = b, a
+    end
+    if length(b) == 0
+        return length(a)
+    end
+
+    previous_row = collect(0:length(b))
+    current_row = similar(previous_row)
+
+    for (i, c1) in enumerate(a)
+        current_row[1] = i
+        for (j, c2) in enumerate(b)
+            insertions = previous_row[j+1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row[j+1] = min(insertions, deletions, substitutions)
+        end
+        previous_row .= current_row
+    end
+
+    return previous_row[end]
+end
+
+"""
+    select_diverse_elites(models::Vector, n::Int; similarity_threshold=0.2)
+
+多様性を考慮して上位 n 個のエリートモデルを選抜する。
+1. スコア順にソート。
+2. 最良モデルは必ず選抜。
+3. 次の候補モデルが、既に選抜されたモデルと「似すぎていない」場合のみ選抜。
+   類似度 = 1 - (距離 / 長い方の長さ) > threshold なら似ていると判定。
+"""
+function select_diverse_elites(models::Vector, n::Int; similarity_threshold=0.8)
+    sorted = sort(models, by=x->x.score)
+    elites = []
+    
+    if isempty(sorted)
+        return elites
+    end
+    
+    # 1位は無条件採用
+    push!(elites, sorted[1])
+    
+    current_idx = 2
+    while length(elites) < n && current_idx <= length(sorted)
+        candidate = sorted[current_idx]
+        is_diverse = true
+        
+        for elite in elites
+            s1 = replace(elite.model, " " => "") # 空白除去して比較
+            s2 = replace(candidate.model, " " => "")
+            dist = levenshtein(s1, s2)
+            max_len = max(length(s1), length(s2))
+            similarity = 1.0 - (dist / max_len)
+            
+            if similarity > similarity_threshold
+                is_diverse = false
+                break
+            end
+        end
+        
+        if is_diverse
+            push!(elites, candidate)
+        end
+        current_idx += 1
+    end
+    
+    # もし多様なモデルが足りなければ、スコア順で埋める
+    if length(elites) < n
+        remaining_needed = n - length(elites)
+        # 既に選ばれたIDを除外
+        selected_ids = Set([m.id for m in elites])
+        
+        for m in sorted
+            if !(m.id in selected_ids)
+                push!(elites, m)
+                if length(elites) >= n
+                    break
+                end
+            end
+        end
+    end
+    
+    return elites
+end
 
 """
     calculate_diversity(models::Vector)

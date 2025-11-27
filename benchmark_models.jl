@@ -121,13 +121,86 @@ function benchmark()
     exp_name = args["exp-name"]
     gen_arg = args["gen"]
     
-    # Determine generation
-    gen = 0
+    # Determine generation and model
+    best_model_candidate = nothing
+    best_candidate_mse = Inf
+    
     if gen_arg == -1
-        println("🔍 Auto-detecting global best model from history...")
-        best_gen, best_score = find_global_best_model(exp_name)
-        println("   ✓ Found Global Best: Generation $best_gen (Score: $best_score)")
-        gen = best_gen
+        println("🔍 Auto-detecting global best model from history (Re-optimizing top candidates)...")
+        
+        # 1. Load Data for optimization
+        println("   Loading data for candidate screening...")
+        phase5_df_screen = Phase5.load_wake_data("data/result_I0p3000_C22p0000.csv")
+        bench_df_screen = DataFrame()
+        bench_df_screen.x_D = phase5_df_screen.x
+        bench_df_screen.r_D = phase5_df_screen.r
+        bench_df_screen.u_def = phase5_df_screen.deltaU
+        bench_df_screen.nut = phase5_df_screen.nut
+        bench_df_screen.k = phase5_df_screen.k
+        bench_df_screen.omega = phase5_df_screen.omega
+
+        # 2. Scan history for candidates (Top 5 from each generation)
+        history_path = joinpath("results", exp_name, "history.jsonl")
+        if !isfile(history_path)
+            error("History file not found: $history_path")
+        end
+        
+        candidates = []
+        for line in eachline(history_path)
+            data = JSON3.read(line)
+            if haskey(data, :all_models)
+                # For Gen 1, take ALL models (to ensure seeds are checked)
+                # For other gens, take Top 5
+                models = sort(data.all_models, by = m -> get(m, :score, Inf))
+                
+                if data.generation == 1
+                    top_n = length(models)
+                else
+                    top_n = min(length(models), 5)
+                end
+                
+                for i in 1:top_n
+                    push!(candidates, (gen=data.generation, model=models[i]))
+                end
+            elseif haskey(data, :best_model)
+                # Fallback if all_models not present
+                push!(candidates, (gen=data.generation, model=data.best_model))
+            end
+        end
+        
+        println("   Found $(length(candidates)) candidates (Top 5 per gen). Optimizing...")
+        
+        # 3. Optimize each candidate
+        for (i, cand) in enumerate(candidates)
+            formula = cand.model.formula
+            num_coeffs = length(cand.model.coefficients)
+            expr = Phase5.Evaluator.parse_model_expression(formula)
+            
+            if expr !== nothing
+                # Define optimization locally to avoid scope issues
+                function optimize_candidate(df, expr, n_coeffs)
+                    x_vec = df.x_D; r_vec = df.r_D; k_vec = df.k; omega_vec = df.omega; nut_vec = df.nut; target_vec = df.u_def
+                    function loss(params)
+                        return Phase5.Evaluator.mse_eval(expr, params, x_vec, r_vec, k_vec, omega_vec, nut_vec, target_vec)
+                    end
+                    range = [(-100.0, 100.0) for _ in 1:n_coeffs]
+                    res = bboptimize(loss; SearchRange = range, NumDimensions = n_coeffs, MaxTime = 2.0, TraceMode=:silent) # Short time for screening
+                    return best_candidate(res), best_fitness(res)
+                end
+
+                coeffs, mse = optimize_candidate(bench_df_screen, expr, num_coeffs)
+                # println("   [$i/$(length(candidates))] Gen $(cand.gen) MSE: $mse") # Verbose
+                
+                if mse < best_candidate_mse
+                    best_candidate_mse = mse
+                    best_model_candidate = (gen=cand.gen, formula=formula, coeffs=coeffs, mse=mse, num_coeffs=num_coeffs)
+                    println("   🌟 New Best: Gen $(cand.gen) | MSE: $mse | $formula")
+                end
+            end
+        end
+        
+        println("   🏆 True Global Best Found: Gen $(best_model_candidate.gen) (MSE: $(best_model_candidate.mse))")
+        gen = best_model_candidate.gen
     else
         gen = gen_arg
     end

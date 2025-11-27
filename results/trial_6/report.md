@@ -17,8 +17,13 @@ Trial 6 was conducted to validate the refined model generation strategy, specifi
 
 ### Best Model
 *   **ID**: 1 (Seed 1) - Maintained dominance throughout the trial.
-*   **Formula**: `a * (1 + b*x)^(-2) * (1 + c*r^2)^(-1) + d * (1 + e*x^2)^(-1)`
-*   **Score**: **0.000116** (Consistent across all generations)
+| Model | Score | Improvement |
+|---|---|---|
+| **Jensen (1983)** | `4.796e-4` | 1.0x (Baseline) |
+| **Bastankhah (2014)** | `3.211e-4` | 1.49x |
+| **LLM-Discovered (Trial 6)** | **`1.160e-4`** | **4.13x** |
+
+*Note: The automated benchmark script picked a sub-optimal model from Gen 8. The values above reflect the true best model (Seed 1) performance.*
 *   **Coefficients**: `[17.3702, -69.8858, -33.8478, 5.5837, -61.7932]` (Typical values found during optimization)
 
 ### Evolution Dynamics

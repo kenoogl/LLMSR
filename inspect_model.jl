@@ -1,3 +1,15 @@
+#!/usr/bin/env julia
+
+"""
+Model Inspection Script
+
+特定の世代・IDのモデルを個別に評価・可視化するためのツール。
+CFDデータとの比較プロットを生成し、局所最適化による詳細な係数調整を行う。
+
+使用方法:
+    julia --project=. inspect_model.jl --gen N [--id ID | --best] [--x-locs "5.0,10.0"]
+"""
+
 using ArgParse
 using JSON3
 using CSV

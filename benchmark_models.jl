@@ -1,3 +1,15 @@
+#!/usr/bin/env julia
+
+"""
+Benchmark Models Script
+
+LLMが発見した最良モデルを、標準的な後流モデル（Jensen, Bastankhah）と比較評価するスクリプト。
+物理ペナルティを考慮した厳密な選定と、オフセット項を含む再最適化を行う。
+
+使用方法:
+    julia --project=. benchmark_models.jl [--exp-name experiment_name] [--gen generation]
+"""
+
 using CSV
 using DataFrames
 using Statistics

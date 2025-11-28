@@ -500,3 +500,24 @@ julia --project=. prepare_report.jl [--exp-name experiment_name]
 ### 式が複雑すぎる
 → EP4（簡素化）を依頼
 → 係数数の上限を設定（例: 5個まで）
+
+---
+
+## 10. トライアル終了後のメンテナンス (Post-Trial Maintenance)
+
+次回のトライアルをより良い状態で開始するために、以下の手順を実施してください。
+
+### 1. seeds.json の更新
+今回のトライアルで発見されたベストモデル（または特徴的なモデル）を `seeds.json` に追加します。これにより、次回のトライアルでその知見を活用できます。
+
+```json
+  {
+    "id": "trial_N_best",
+    "formula": "...",
+    "score": 0.000xxx,
+    "description": "Trial N Best: ..."
+  }
+```
+
+### 2. 結果のアーカイブ
+`results/{exp_name}` ディレクトリをそのまま保存し、必要に応じてバックアップを取ってください。

@@ -104,7 +104,7 @@ function evaluate_formula(model_str::String;
         
         # 複雑性ペナルティ f3 の計算
         n0 = Evaluator.calculate_complexity(ex)
-        if n0 <= 50
+        if n0 <= 80
             f3 = sqrt(n0 + 1000) / sqrt(1001)
         else
             f3 = sqrt(n0^2 + 910) / sqrt(1001)

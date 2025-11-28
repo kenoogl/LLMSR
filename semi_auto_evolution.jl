@@ -85,6 +85,7 @@ function generate_initial(size::Int, exp_name::String, seeds_file::String)
     seeds = EvolutionUtils.load_seeds(seeds_file)
     if !isempty(seeds)
         println("   ✓ Loaded $(length(seeds)) seed models from $seeds_file")
+        println("   ℹ️  Using these seeds to initialize the population.")
     else
         println("   ℹ️  No seeds loaded (starting fresh)")
     end

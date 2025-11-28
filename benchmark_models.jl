@@ -112,8 +112,11 @@ function benchmark()
     gen_arg = args["gen"]
     
     # Determine generation and model
-    best_model_candidate = nothing
-    best_candidate_mse = Inf
+    best_valid_model = nothing
+    best_valid_mse = Inf
+    
+    best_raw_model = nothing
+    best_raw_mse = Inf
     
     if gen_arg == -1
         println("🔍 Auto-detecting global best model from history (Re-optimizing top candidates)...")
@@ -183,37 +186,35 @@ function benchmark()
                 # Calculate Physical Penalty
                 penalty = Phase5.Evaluator.physical_penalty(expr, coeffs, bench_df_screen.x_D, bench_df_screen.r_D, bench_df_screen.k, bench_df_screen.omega, bench_df_screen.nut, bench_df_screen.u_def)
                 
+                # Track Best Raw Model (MSE only)
+                if mse < best_raw_mse
+                    best_raw_mse = mse
+                    best_raw_model = (gen=cand.gen, formula=formula, coeffs=coeffs, mse=mse, penalty=penalty, num_coeffs=num_coeffs, valid=(penalty < 1.0))
+                    println("   ⚠️  New Best RAW Model: Gen $(cand.gen) | MSE: $mse | Penalty: $penalty")
+                end
 
-                
-                # Selection Logic:
-                # Prioritize Valid Models (Penalty < Threshold)
+                # Track Best Valid Model (Penalty < Threshold)
                 penalty_threshold = 1.0
-                
-                is_valid = penalty < penalty_threshold
-                
-                if is_valid
-                    if best_model_candidate === nothing || !get(best_model_candidate, :valid, false) || mse < best_candidate_mse
-                        best_candidate_mse = mse
-                        best_model_candidate = (gen=cand.gen, formula=formula, coeffs=coeffs, mse=mse, penalty=penalty, num_coeffs=num_coeffs, valid=true)
-                        println("   🌟 New Best VALID Model: Gen $(cand.gen) | MSE: $mse | Penalty: $penalty | $formula")
-                    end
-                else
-                    # Keep track of best raw model just in case no valid model is found
-                    if best_model_candidate === nothing || (!get(best_model_candidate, :valid, false) && mse < best_candidate_mse)
-                        best_candidate_mse = mse
-                        best_model_candidate = (gen=cand.gen, formula=formula, coeffs=coeffs, mse=mse, penalty=penalty, num_coeffs=num_coeffs, valid=false)
-                        println("   ⚠️  New Best (Invalid) Model: Gen $(cand.gen) | MSE: $mse | Penalty: $penalty | $formula")
+                if penalty < penalty_threshold
+                    if mse < best_valid_mse
+                        best_valid_mse = mse
+                        best_valid_model = (gen=cand.gen, formula=formula, coeffs=coeffs, mse=mse, penalty=penalty, num_coeffs=num_coeffs, valid=true)
+                        println("   🌟 New Best VALID Model: Gen $(cand.gen) | MSE: $mse | Penalty: $penalty")
                     end
                 end
             end
         end
         
-        if best_model_candidate !== nothing
-            status = best_model_candidate.valid ? "VALID" : "INVALID (Fallback)"
-            println("   🏆 True Global Best Found ($status): Gen $(best_model_candidate.gen) (MSE: $(best_model_candidate.mse), Penalty: $(best_model_candidate.penalty))")
-            gen = best_model_candidate.gen
+        if best_valid_model !== nothing
+            println("   🏆 True Global Best Found (VALID): Gen $(best_valid_model.gen) (MSE: $(best_valid_model.mse), Penalty: $(best_valid_model.penalty))")
+            gen = best_valid_model.gen
+        elseif best_raw_model !== nothing
+            println("   ⚠️  No VALID model found. Falling back to Best RAW model.")
+            println("   🏆 Best RAW Model: Gen $(best_raw_model.gen) (MSE: $(best_raw_model.mse), Penalty: $(best_raw_model.penalty))")
+            gen = best_raw_model.gen
+            best_valid_model = best_raw_model # Fallback
         else
-            error("No valid candidates found.")
+            error("No candidates found.")
         end
     else
         gen = gen_arg
@@ -378,6 +379,16 @@ function benchmark()
         
         println(io, "Improvement over Jensen:     $(round((jensen_mse - llm_mse)/jensen_mse * 100, digits=2))%")
         println(io, "Improvement over Bastankhah: $(round((bast_mse - llm_mse)/bast_mse * 100, digits=2))%")
+        println(io, "")
+
+        if best_raw_model !== nothing
+            println(io, "[Reference: Best Raw MSE Model (No Penalty)]")
+            println(io, "Gen: $(best_raw_model.gen)")
+            println(io, "Formula: $(best_raw_model.formula)")
+            println(io, "MSE: $(best_raw_model.mse)")
+            println(io, "Penalty: $(best_raw_model.penalty)")
+            println(io, "Coeffs: $(best_raw_model.coeffs)")
+        end
     end
     
     println("✅ Benchmark Complete! Results saved to $plots_dir")

@@ -431,3 +431,38 @@ EP1の場合は親情報は `null` にしてください。
 - 数式は $ ... $ 形式で記述し、可読性を高めること。
 - 重要な数値（MSE、改善率）は強調すること。
 ```
+
+---
+
+## 7. 参考知識: 高度な後流モデル (Advanced Wake Models)
+
+以下のモデル知識を、新しい構造式の提案に役立ててください。
+
+### 1. Jensen-Gaussian モデル
+Jensenモデルの線形拡大をベースにしつつ、速度分布をガウス関数で記述。
+$$ u = U_0 - (U_0 - U_{\Delta}) \frac{5.16}{\sqrt{2\pi}} \exp\left(-\frac{r^2}{2 (r_x/2.58)^2}\right) $$
+ここで $U_{\Delta}$ は中心速度欠損。
+
+### 2. 2D Jensen-k モデル (Cosine)
+速度欠損の分布にコサイン関数を使用。
+$$ u = U_0 - U_{\Delta} \left[ \cos\left(\frac{\pi r}{r_x} + \pi\right) + 1 \right] $$
+※ $r_x$ は後流半径。コサイン関数の半周期を超えると破綻する可能性に注意。
+
+### 3. Curled Wake モデル
+ヨー角を持つ風車からの反転回転渦（Counter-rotating vortices）を考慮。
+Navier-Stokes方程式の簡略化に基づき、有効粘度 $\nu_{\text{eff}}$ を用いる。
+$$ U \frac{\partial u'}{\partial x} \approx \nu_{\text{eff}} \nabla^2 u' $$
+渦の減衰（Vortex Decay）や、Lamb-Oseen渦としての記述が含まれる。
+
+### 4. Larsen モデル
+RANS方程式を薄いせん断層近似で単純化。
+$$ u_x(x, r) \propto \left[ r^{3/2} (x)^{-1/2} - C \right]^2 $$
+Prandtlの混合長理論に基づく。
+
+### 5. FUGA モデル
+線形化されたRANS方程式に基づく。
+渦粘性 $\nu_T = \kappa u_* z$ を使用し、圧力項も考慮。
+物理的に厳密だが計算コストが高い。
+
+**ヒント**:
+これらのモデルから、「コサイン型プロファイル」や「渦粘性 $\nu_T$ への依存性」、「$x^{-1/2}$ のような減衰項」などのアイデアを取り入れることができます。

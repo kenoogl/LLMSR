@@ -189,18 +189,42 @@ function benchmark()
                 end
 
                 coeffs, mse = optimize_candidate(bench_df_screen, expr, num_coeffs)
-                # println("   [$i/$(length(candidates))] Gen $(cand.gen) MSE: $mse") # Verbose
                 
-                if mse < best_candidate_mse
-                    best_candidate_mse = mse
-                    best_model_candidate = (gen=cand.gen, formula=formula, coeffs=coeffs, mse=mse, num_coeffs=num_coeffs)
-                    println("   🌟 New Best: Gen $(cand.gen) | MSE: $mse | $formula")
+                # Calculate Physical Penalty
+                penalty = Phase5.Evaluator.physical_penalty(expr, coeffs, bench_df_screen.x_D, bench_df_screen.r_D, bench_df_screen.k, bench_df_screen.omega, bench_df_screen.nut, bench_df_screen.u_def)
+                
+                # println("   [$i/$(length(candidates))] Gen $(cand.gen) MSE: $mse | Penalty: $penalty") # Verbose
+                
+                # Selection Logic:
+                # Prioritize Valid Models (Penalty < Threshold)
+                penalty_threshold = 1.0
+                
+                is_valid = penalty < penalty_threshold
+                
+                if is_valid
+                    if best_model_candidate === nothing || !get(best_model_candidate, :valid, false) || mse < best_candidate_mse
+                        best_candidate_mse = mse
+                        best_model_candidate = (gen=cand.gen, formula=formula, coeffs=coeffs, mse=mse, penalty=penalty, num_coeffs=num_coeffs, valid=true)
+                        println("   🌟 New Best VALID Model: Gen $(cand.gen) | MSE: $mse | Penalty: $penalty | $formula")
+                    end
+                else
+                    # Keep track of best raw model just in case no valid model is found
+                    if best_model_candidate === nothing || (!get(best_model_candidate, :valid, false) && mse < best_candidate_mse)
+                        best_candidate_mse = mse
+                        best_model_candidate = (gen=cand.gen, formula=formula, coeffs=coeffs, mse=mse, penalty=penalty, num_coeffs=num_coeffs, valid=false)
+                        println("   ⚠️  New Best (Invalid) Model: Gen $(cand.gen) | MSE: $mse | Penalty: $penalty | $formula")
+                    end
                 end
             end
         end
         
-        println("   🏆 True Global Best Found: Gen $(best_model_candidate.gen) (MSE: $(best_model_candidate.mse))")
-        gen = best_model_candidate.gen
+        if best_model_candidate !== nothing
+            status = best_model_candidate.valid ? "VALID" : "INVALID (Fallback)"
+            println("   🏆 True Global Best Found ($status): Gen $(best_model_candidate.gen) (MSE: $(best_model_candidate.mse), Penalty: $(best_model_candidate.penalty))")
+            gen = best_model_candidate.gen
+        else
+            error("No valid candidates found.")
+        end
     else
         gen = gen_arg
     end
@@ -284,7 +308,10 @@ function benchmark()
     end
 
     llm_coeffs, llm_mse = optimize_llm(bench_df, llm_expr, num_coeffs)
+    llm_penalty = Phase5.Evaluator.physical_penalty(llm_expr, llm_coeffs, bench_df.x_D, bench_df.r_D, bench_df.k, bench_df.omega, bench_df.nut, bench_df.u_def)
+    
     println("   LLM Model MSE (Re-optimized): $llm_mse")
+    println("   Penalty: $llm_penalty")
     println("   Coeffs: $llm_coeffs")
     
     # 4. Generate Plots
@@ -355,6 +382,7 @@ function benchmark()
         println(io, "[LLM Best Model]")
         println(io, "Formula: $llm_formula_str")
         println(io, "MSE: $llm_mse")
+        println(io, "Penalty: $llm_penalty")
         println(io, "Coeffs: $llm_coeffs")
         println(io, "")
         

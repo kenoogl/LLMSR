@@ -26,29 +26,7 @@ function parse_commandline()
     return parse_args(s)
 end
 
-function find_global_best_model(exp_name)
-    history_path = joinpath("results", exp_name, "history.jsonl")
-    if !isfile(history_path)
-        error("History file not found: $history_path")
-    end
-    
-    best_score = Inf
-    best_gen = -1
-    
-    for line in eachline(history_path)
-        data = JSON3.read(line)
-        if haskey(data, :best_score) && data.best_score < best_score
-            best_score = data.best_score
-            best_gen = data.generation
-        end
-    end
-    
-    if best_gen == -1
-        error("Could not find any valid generations in history")
-    end
-    
-    return best_gen, best_score
-end
+
 
 # --- Model Definitions ---
 
@@ -193,7 +171,7 @@ function benchmark()
                 # Calculate Physical Penalty
                 penalty = Phase5.Evaluator.physical_penalty(expr, coeffs, bench_df_screen.x_D, bench_df_screen.r_D, bench_df_screen.k, bench_df_screen.omega, bench_df_screen.nut, bench_df_screen.u_def)
                 
-                # println("   [$i/$(length(candidates))] Gen $(cand.gen) MSE: $mse | Penalty: $penalty") # Verbose
+
                 
                 # Selection Logic:
                 # Prioritize Valid Models (Penalty < Threshold)

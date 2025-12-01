@@ -14,7 +14,7 @@ LLMが生成した構造式を評価するためのテンプレートとして�
 push!(LOAD_PATH, joinpath(@__DIR__, "src"))
 
 # Phase5モジュールを読み込み
-include("src/Phase5.jl")
+include("src/Phase5/Phase5.jl")
 using .Phase5
 
 println("="^60)

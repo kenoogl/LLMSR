@@ -1,4 +1,8 @@
-# 半自動進化計算ワークフロー
+# 半自動進化計算ワークフロー (Phase 5: Legacy)
+
+> [!NOTE]
+> これは **Phase 5 (Trial 1-7)** までのワークフローです。
+> 最新の **Phase 6 (Trial 8以降)** については、[WORKFLOW_PHASE6.md](WORKFLOW_PHASE6.md) を参照してください。
 
 このガイドでは、Gemini LLMとJuliaを使った半自動進化計算の実行手順を説明します。
 
@@ -41,7 +45,7 @@ julia --project=. main.jl
     julia --project=. semi_auto_evolution.jl --generate-initial --size 20 [--exp-name experiment_name]
     ```
     - `results/{exp_name}/feedback_gen0.json` が生成されます。
-    - このファイルには、Geminiへの指示が含まれています。
+    - このファイルには、Geminiへの指示が含まれています（`templates/phase5_prompt.md` を使用）。
     - `seeds.json` が存在する場合、そこからシードモデルが自動的にロードされ、LLMに過去の成功モデルが提供されます。
     - 別のシードファイルを使用するには: `--seeds-file path/to/seeds.json` を指定します。
 

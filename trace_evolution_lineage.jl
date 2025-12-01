@@ -338,10 +338,14 @@ function trace_lineage(history::Vector)
     for h in history
         push!(lineage, (
             generation = h.generation,
+            id = 1, # Default to ID 1 for best model in fallback
             formula = h.best_model.formula,
             score = h.best_score,
+            coefficients = get(h.best_model, :coefficients, Float64[]),
             reason = get(h.best_model, :reason, ""),
-            ep_type = get(h.best_model, :ep_type, "EP1")
+            ep_type = get(h.best_model, :ep_type, "EP1"),
+            parent_generation = nothing,
+            parent_id = nothing
         ))
     end
     

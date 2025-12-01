@@ -19,7 +19,7 @@ using Printf
 # プロジェクトのsrcディレクトリを読み込み
 push!(LOAD_PATH, joinpath(@__DIR__, "src"))
 
-include("src/Phase5.jl")
+include("src/Phase5/Phase5.jl")
 include("src/evolution_utils.jl")
 
 using .Phase5
@@ -121,14 +121,17 @@ function evaluate_generation(gen::Int, input_file::String, csv_path::String, exp
         error("No models found in input file!")
     end
     
-    println("   ✓ Loaded $(length(models)) models")
-    
-    # データパスの確認
-    if !isfile(csv_path)
-        error("Data file not found: $csv_path")
+    # Load prompt template
+    template_path = "templates/phase5_prompt.md"
+    if !isfile(template_path)
+        # Fallback for backward compatibility if renamed
+        if isfile("templates/llm_prompt_template.md")
+             template_path = "templates/llm_prompt_template.md"
+        else
+             error("Prompt template not found: $template_path")
+        end
     end
-    
-    # 各モデルを評価
+    prompt_template = read(template_path, String)
     println("\n⚙️  Evaluating models...")
     evaluated = []
     

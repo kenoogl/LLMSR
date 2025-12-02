@@ -243,13 +243,36 @@ function benchmark()
     println("✅ Data Loaded: $(nrow(bench_df)) points")
     
     # 2. Optimize Standard Models
-    println("⚙️  Optimizing Jensen Model...")
-    jensen_params, jensen_mse = optimize_jensen(bench_df)
-    println("   Jensen MSE: $jensen_mse")
     
-    println("⚙️  Optimizing Bastankhah Model...")
-    bast_params, bast_mse = optimize_bastankhah(bench_df)
-    println("   Bastankhah MSE: $bast_mse")
+    # Check for calibration file
+    data_basename = splitext(basename("data/result_I0p3000_C22p0000.csv"))[1]
+    calibration_file = joinpath("params", "standard_models_$(data_basename).json")
+    
+    jensen_params = nothing
+    jensen_mse = Inf
+    bast_params = nothing
+    bast_mse = Inf
+    
+    if isfile(calibration_file)
+        println("🔹 Found calibration file: $calibration_file")
+        calib_data = JSON3.read(read(calibration_file, String))
+        
+        jensen_params = calib_data.jensen.params
+        jensen_mse = calib_data.jensen.mse
+        println("   ✅ Loaded Jensen (MSE: $jensen_mse)")
+        
+        bast_params = calib_data.bastankhah.params
+        bast_mse = calib_data.bastankhah.mse
+        println("   ✅ Loaded Bastankhah (MSE: $bast_mse)")
+    else
+        println("⚙️  Optimizing Jensen Model...")
+        jensen_params, jensen_mse = optimize_jensen(bench_df)
+        println("   Jensen MSE: $jensen_mse")
+        
+        println("⚙️  Optimizing Bastankhah Model...")
+        bast_params, bast_mse = optimize_bastankhah(bench_df)
+        println("   Bastankhah MSE: $bast_mse")
+    end
     
     # 3. Load and Optimize LLM Best Model
     feedback_file = joinpath(base_dir, "feedback_gen$gen.json")
@@ -262,8 +285,14 @@ function benchmark()
     
     # Get best model formula
     best_model_data = feedback_data.best_model
-    llm_formula_str = best_model_data.formula
-    num_coeffs = length(best_model_data.coefficients)
+    llm_formula_str = get(best_model_data, :formula, get(best_model_data, :model, ""))
+    if isempty(llm_formula_str)
+        error("Could not find formula or model field in best_model data")
+    end
+    
+    # Handle coefficients vs coeffs
+    coeffs_data = get(best_model_data, :coefficients, get(best_model_data, :coeffs, []))
+    num_coeffs = length(coeffs_data)
     
     println("   Formula: $llm_formula_str")
     println("   Num Coeffs: $num_coeffs")
@@ -287,8 +316,16 @@ function benchmark()
         target_vec = df.u_def
         
         function loss(params)
-            # Use Phase5.Evaluator.mse_eval which handles vectorization
-            return Phase5.Evaluator.mse_eval(expr, params, x_vec, r_vec, k_vec, omega_vec, nut_vec, target_vec)
+            try
+                # Use Phase5.Evaluator.mse_eval which handles vectorization
+                return Phase5.Evaluator.mse_eval(expr, params, x_vec, r_vec, k_vec, omega_vec, nut_vec, target_vec)
+            catch e
+                if isa(e, DomainError)
+                    return 1e9 # High penalty for invalid domain
+                else
+                    rethrow(e)
+                end
+            end
         end
         
         # Dynamic search range: -100.0 to 100.0 for all coeffs to allow offsets

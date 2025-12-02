@@ -7,9 +7,9 @@ using Printf
 
 # Submodules
 include("DataLoader.jl")
-include("Physics.jl")
 include("ReasonScorer.jl")
 include("Evaluator.jl")
+include("Physics.jl")
 include("Optimizer.jl")
 
 using .DataLoader
@@ -18,7 +18,7 @@ using .ReasonScorer
 using .Evaluator
 using .Optimizer
 
-export evaluate_formula, load_wake_data
+export evaluate_formula, load_wake_data, evaluate_model_full
 
 # Global Data Cache
 const DATA_LOADED = Ref(false)
@@ -35,12 +35,10 @@ function load_wake_data(csv_path::String)
 end
 
 """
-    evaluate_formula(model_str::String; num_coeffs=4, with_penalty=true, csv_path="...")
+    evaluate_formula(model_str; ...)
 
-Evaluates a model formula using Phase 6 logic (MSE + Physics + Reason).
-Note: Reason scoring requires the 'reason' string, which is not passed here. 
-This function is primarily for numerical evaluation. 
-For full evaluation including reason, use `evaluate_model_full`.
+Evaluates numerical performance and physical penalties.
+Returns (score, θ_opt, penalty_breakdown, mse).
 """
 function evaluate_formula(model_str::String;
                           num_coeffs::Int=4,
@@ -49,29 +47,55 @@ function evaluate_formula(model_str::String;
     
     df = load_wake_data(csv_path)
     
-    # Parse expression
     ex = Evaluator.parse_model_expression(model_str)
     if ex === nothing
-        return (Inf, nothing)
+        return (Inf, nothing, nothing, Inf)
     end
     
-    # Optimize Coefficients (using DE)
-    # Optimizer now uses Physics module for penalty calculation
-    θ_opt, mse_score, physics_penalty = Optimizer.optimize_coefficients(
+    # Optimize
+    θ_opt, mse_score, physics_penalty, penalty_breakdown = Optimizer.optimize_coefficients(
         ex, df;
         num_coeffs=num_coeffs,
         with_penalty=with_penalty
     )
     
-    # Combine scores (MSE + Physics)
-    # Note: Reason score is not included here as we don't have the reason text.
-    # This function returns the numerical fitness.
+    # Base Score (MSE * (1 + Penalty))
+    base_score = mse_score * (1.0 + physics_penalty)
     
-    # Final Score Calculation
-    # We use a multiplicative penalty formulation: Score = MSE * (1 + Penalty)
-    final_score = mse_score * (1.0 + physics_penalty)
+    return (base_score, θ_opt, penalty_breakdown, mse_score)
+end
+
+"""
+    evaluate_model_full(model_str, reason_str; ...)
+
+Evaluates model including Reason quality.
+Final Score = BaseScore * (1.0 - ReasonScore * 0.1)
+(ReasonScore is 0.0 to 1.0, so max 10% bonus for good reasoning)
+"""
+function evaluate_model_full(model_str::String, reason_str::String;
+                             num_coeffs::Int=4,
+                             with_penalty::Bool=true,
+                             csv_path::String="data/result_I0p3000_C22p0000.csv")
+                             
+    base_score, θ_opt, penalty_breakdown, mse = evaluate_formula(model_str; 
+        num_coeffs=num_coeffs, with_penalty=with_penalty, csv_path=csv_path)
+        
+    if θ_opt === nothing
+        return (Inf, nothing, nothing, Inf, 0.0)
+    end
     
-    return (final_score, θ_opt)
+    # Calculate Reason Score
+    # We need to pass the penalty breakdown to the scorer? 
+    # Or just score the text quality?
+    # ReasonScorer.score_reason(reason_text)
+    reason_score = ReasonScorer.score_reason(reason_str)
+    
+    # Apply Reason Bonus (reduce score)
+    # Max bonus: 20% reduction for perfect reason
+    bonus_factor = 0.2
+    final_score = base_score * (1.0 - reason_score * bonus_factor)
+    
+    return (final_score, θ_opt, penalty_breakdown, mse, reason_score)
 end
 
 end # module Phase6

@@ -148,10 +148,16 @@ function main()
     
     # 2. Prepare Evaluation Function
     # Identify variables in formula
+    formula_str = get(target_model, :formula, get(target_model, :model, ""))
+    if isempty(formula_str)
+        println("❌ Error: Could not find formula or model field")
+        return
+    end
+
     potential_coeffs = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
     found_coeffs = Char[]
     for c in potential_coeffs
-        if occursin(Regex("\\b$c\\b"), target_model.formula)
+        if occursin(Regex("\\b$c\\b"), formula_str)
             push!(found_coeffs, c)
         end
     end
@@ -162,7 +168,7 @@ function main()
     println("   Optimizing $num_coeffs coefficients locally (Data: x > 0.1)...")
     
     # Create a string with p[i] replacements
-    expr_str = target_model.formula
+    expr_str = formula_str
     for (i, c) in enumerate(potential_coeffs)
         if i <= num_coeffs
             expr_str = replace(expr_str, Regex("\\b$c\\b") => "p[$i]")
@@ -179,8 +185,12 @@ function main()
         for row in eachrow(opt_df)
             val = try
                 Base.invokelatest(model_func, row.x_D, row.r_D, row.nut, p)
-            catch
-                1e9
+            catch e
+                if isa(e, DomainError)
+                    1e9
+                else
+                    1e9
+                end
             end
             mse += (val - row.u_def)^2
         end
@@ -198,10 +208,88 @@ function main()
     
     # Final result is already in new_coeffs and score
     
-    println("   Old Coeffs: $(target_model.coefficients)")
+    old_coeffs = get(target_model, :coefficients, get(target_model, :coeffs, []))
+    println("   Old Coeffs: $old_coeffs")
     println("   New Coeffs: $new_coeffs")
     println("   New Score:  $score")
     
+    # --- Optimize Standard Models (Jensen & Bastankhah) ---
+    println("\n⚙️  Optimizing Standard Models for Comparison...")
+    
+    # Check for calibration file
+    # Default to auto-detect based on data filename
+    data_basename = splitext(basename("data/result_I0p3000_C22p0000.csv"))[1] # Hardcoded for now, ideally passed or inferred
+    # Note: In a real scenario, we should infer this from the loaded data path, but load_cfd_data hardcodes it.
+    # Let's assume the standard naming convention.
+    calibration_file = joinpath("params", "standard_models_$(data_basename).json")
+    
+    jensen_params = nothing
+    jensen_mse = Inf
+    bast_params = nothing
+    bast_mse = Inf
+    
+    if isfile(calibration_file)
+        println("   🔹 Found calibration file: $calibration_file")
+        calib_data = JSON3.read(read(calibration_file, String))
+        
+        jensen_params = calib_data.jensen.params
+        jensen_mse = calib_data.jensen.mse
+        println("   ✅ Loaded Jensen (MSE: $jensen_mse)")
+        
+        bast_params = calib_data.bastankhah.params
+        bast_mse = calib_data.bastankhah.mse
+        println("   ✅ Loaded Bastankhah (MSE: $bast_mse)")
+    else
+        println("   ⚠️  Calibration file not found. Falling back to on-the-fly optimization.")
+        
+        # Jensen
+        function optimize_jensen(df)
+            function loss_j(params)
+                A, k = params
+                mse = 0.0
+                for row in eachrow(df)
+                    x = row.x_D
+                    r = row.r_D
+                    target = row.u_def
+                    Rw = 0.5 + k * x
+                    pred = 0.0
+                    if abs(r) <= Rw
+                        pred = A * (0.5 / Rw)^2
+                    end
+                    mse += (pred - target)^2
+                end
+                return mse / nrow(df)
+            end
+            res = bboptimize(loss_j; SearchRange = [(0.0, 2.0), (0.0, 0.5)], NumDimensions = 2, MaxTime = 10.0, TraceMode=:silent)
+            return best_candidate(res), best_fitness(res)
+        end
+        
+        jensen_params, jensen_mse = optimize_jensen(opt_df)
+        println("   Jensen MSE: $jensen_mse (Params: $jensen_params)")
+        
+        # Bastankhah
+        function optimize_bastankhah(df)
+            function loss_b(params)
+                A, k, epsilon = params
+                mse = 0.0
+                for row in eachrow(df)
+                    x = row.x_D
+                    r = row.r_D
+                    target = row.u_def
+                    sigma = k * x + epsilon
+                    pred = (A / sigma^2) * exp(-0.5 * (r / sigma)^2)
+                    mse += (pred - target)^2
+                end
+                return mse / nrow(df)
+            end
+            res = bboptimize(loss_b; SearchRange = [(0.0, 1.0), (0.0, 0.2), (0.0, 0.5)], NumDimensions = 3, MaxTime = 10.0, TraceMode=:silent)
+            return best_candidate(res), best_fitness(res)
+        end
+        
+        bast_params, bast_mse = optimize_bastankhah(opt_df)
+        println("   Bastankhah MSE: $bast_mse (Params: $bast_params)")
+    end
+
     # Load CFD Data for plotting (we still need this locally)
     bench_df = load_cfd_data()
     println("✅ Data Loaded: $(nrow(bench_df)) points")
@@ -225,23 +313,39 @@ function main()
         u_cfd = slice_df.u_def
         
         # Predict using new coefficients
-        # We can use Phase5.Evaluator.eval_model if accessible, or our local evaluate_model
-        # Let's use our local evaluate_model but update it to handle the vector coeffs
         u_pred = Float64[]
         for row in eachrow(slice_df)
-            val = evaluate_model(target_model.formula, new_coeffs, x_loc, row.r_D, row.nut)
+            val = evaluate_model(formula_str, new_coeffs, x_loc, row.r_D, row.nut)
             push!(u_pred, val)
         end
         
+        # Predict Jensen
+        A_j, k_j = jensen_params
+        Rw_j = 0.5 + k_j * x_loc
+        u_jensen = [abs(r) <= Rw_j ? A_j * (0.5/Rw_j)^2 : 0.0 for r in r_vals]
+        
+        # Predict Bastankhah
+        A_b, k_b, eps_b = bast_params
+        sigma_b = k_b * x_loc + eps_b
+        u_bast = [(A_b / sigma_b^2) * exp(-0.5 * (r / sigma_b)^2) for r in r_vals]
+        
         # Plot
-        title_str = use_best ? "Gen $gen Best Model (Re-optimized)" : "Gen $gen Model $model_id (Re-optimized)"
+        # Plot
+        # Match benchmark_models.jl style exactly
+        # Title: "x/D = ..." (Simple title to match benchmark)
+        # Colors: Auto-cycling (remove hardcoded colors)
+        # Markers: White filled (markercolor=:white)
+        
         p = plot(r_vals, u_cfd, seriestype=:scatter, label="CFD (LES)", 
-                 xlabel="Radial Distance (r/D)", ylabel="Velocity Deficit (Δu/U)", 
-                 title="$title_str at x/D = $x_loc", legend=:topright, 
-                 markersize=3, color=:black, alpha=0.5,
+                 xlabel="r/D", ylabel="Δu/U", 
+                 title="x/D = $x_loc", legend=:topright, 
+                 markercolor=:white,
+                 guidefontsize=14, tickfontsize=12, margin=15Plots.mm,
                  size=(1200, 800))
         
-        plot!(p, r_vals, u_pred, label="Model Prediction", linewidth=3, color=:red)
+        plot!(p, r_vals, u_jensen, label="Jensen", linestyle=:dash, linewidth=2)
+        plot!(p, r_vals, u_bast, label="Bastankhah", linestyle=:dashdot, linewidth=2)
+        plot!(p, r_vals, u_pred, label="LLM (Gen $gen)", linewidth=3)
         
         # Save
         filename = use_best ? "inspect_gen$(gen)_best_x$(Int(x_loc)).png" : "inspect_gen$(gen)_model$(model_id)_x$(Int(x_loc)).png"

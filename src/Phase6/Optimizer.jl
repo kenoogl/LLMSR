@@ -22,49 +22,42 @@ function optimize_coefficients(ex, df; num_coeffs=4, with_penalty=true)
         # 2. Physics Penalty (if enabled)
         penalty = 0.0
         if with_penalty
-            # Need to evaluate model again to get predictions for penalty check
-            # Or pass predictions if mse_eval returned them (it doesn't currently)
-            # Re-evaluating is safer but slower. 
-            # For optimization loop, we might want to integrate them.
-            # Here we re-evaluate for clarity.
             y_pred = Evaluator.eval_model(ex, θ, x, r, k, omega, nut)
-            penalty = Physics.calculate_penalty(y_pred, deltaU, x, r, k, omega, nut, θ)
+            # New signature: ex, coeffs, y_pred, x, r, k, omega, nut
+            penalty = Physics.calculate_penalty(ex, θ, y_pred, x, r, k, omega, nut)
         end
         
         # Combined Objective for DE
-        # We want to minimize MSE, but also minimize Penalty.
         # Objective = MSE * (1 + Penalty)
         return mse * (1.0 + penalty)
     end
     
     # Search Range
-    # Allow negative coefficients as per recent learnings
     search_range = [(-100.0, 100.0) for _ in 1:num_coeffs]
     
     # Optimization
     res = bboptimize(loss; 
         SearchRange = search_range, 
         NumDimensions = num_coeffs, 
-        MaxTime = 5.0, # Fast optimization for evolution loop
+        MaxTime = 5.0, 
         TraceMode = :silent
     )
     
     best_θ = best_candidate(res)
-    best_fitness_val = best_fitness(res)
     
-    # Decompose score for reporting
-    # We need to return MSE and Penalty separately if possible, 
-    # but best_fitness returns the combined value.
-    # Let's re-calculate to separate them.
+    # Re-calculate for reporting
     final_mse = Evaluator.mse_eval(ex, best_θ, x, r, k, omega, nut, deltaU)
     
     final_penalty = 0.0
+    penalty_breakdown = (P1=0.0, P2=0.0, P3=0.0, P4=0.0)
+    
     if with_penalty
         y_pred = Evaluator.eval_model(ex, best_θ, x, r, k, omega, nut)
-        final_penalty = Physics.calculate_penalty(y_pred, deltaU, x, r, k, omega, nut, best_θ)
+        final_penalty = Physics.calculate_penalty(ex, best_θ, y_pred, x, r, k, omega, nut)
+        penalty_breakdown = Physics.calculate_individual_penalties(ex, best_θ, y_pred, x, r, k, omega, nut)
     end
     
-    return best_θ, final_mse, final_penalty
+    return best_θ, final_mse, final_penalty, penalty_breakdown
 end
 
 end # module

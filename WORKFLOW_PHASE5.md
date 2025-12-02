@@ -392,55 +392,46 @@ LLMSR/
    - GPT-4o, Claude でも同じ実験
    - 結果の比較分析
 
-## 7. モデルの詳細分析 (Model Inspection)
+## 8. 評価・分析ツール (Evaluation & Analysis Tools)
 
-特定の世代の特定のモデルを個別に可視化し、CFDデータと比較するためのツール `inspect_model.jl` を使用できます。
+Phase 6 で導入された高度な分析ツールは、Phase 5 でもそのまま利用可能です。
+これにより、実験間の公平な比較と詳細な検査が可能になります。
 
-### 使用方法
+### 8.1 ベースラインのキャリブレーション (Calibration)
 
+評価の一貫性を保つため、標準モデル（Jensen, Bastankhah）の最適係数を事前に厳密に計算し、固定します。
+
+**使用方法**:
+```bash
+julia --project=. calibrate_baselines.jl
+```
+- 入力データ（`data/result_I0p3000_C22p0000.csv`）に対応する設定ファイル `params/standard_models_result_I0p3000_C22p0000.json` が生成されます。
+- このファイルが存在する場合、以下のツールは自動的にこれを読み込みます。
+
+### 8.2 モデルの詳細分析 (Inspection)
+
+特定の世代の特定のモデルを個別に可視化し、CFDデータと比較します。
+
+**使用方法**:
 ```bash
 # 特定の世代の最良モデルを描画 (例: Gen 20)
-julia --project=. inspect_model.jl --gen 20 --best [--exp-name experiment_name]
+julia --project=. inspect_model.jl --gen 20 --best --exp-name trial_7
 
 # 特定の世代の特定IDのモデルを描画 (例: Gen 7, ID 3)
-julia --project=. inspect_model.jl --gen 7 --id 3 [--exp-name experiment_name]
-
-# プロット位置を指定する場合 (デフォルトは 5.0,10.0)
-julia --project=. inspect_model.jl --gen 20 --best --x-locs "2.0,5.0,8.0,12.0" [--exp-name experiment_name]
+julia --project=. inspect_model.jl --gen 7 --id 3 --exp-name trial_7
 ```
+- **特徴**: キャリブレーション済みの標準モデルと比較するため、常に同じ基準線で評価できます。
 
-### 出力
-生成されたグラフは `results/{exp_name}/plots/` に保存されます。
-- ファイル名例: `inspect_gen20_best_x5.png`, `inspect_gen7_model3_x10.png`
+### 8.3 ベンチマークと最終評価 (Benchmarking)
 
-### ⚠️ 注意点（ベンチマークとの違い）
-`inspect_model.jl` は汎用的な可視化ツールであるため、**安定性を重視して正の値の係数のみを探索**します（MSE $\approx 0.0003$）。
-一方、後述の `benchmark_models.jl` は、モデル構造を特定した上で負のオフセット項なども許容する**厳密な最適化**を行うため、より高い精度（MSE $\approx 0.00008$）を示します。
-グラフの見た目上の差はわずかですが、数値的な厳密さを求める場合はベンチマークツールを使用してください。
+発見された最良モデルを、標準的な後流モデルと厳密に比較します。
 
----
-
-## 8. ベンチマークと最終評価 (Benchmarking)
-
-発見された最良モデルを、標準的な後流モデル（Jensen, Bastankhah）と厳密に比較するためのツール `benchmark_models.jl` を使用します。
-
-### 使用方法
-
+**使用方法**:
 ```bash
-```bash
-julia --project=. benchmark_models.jl [--exp-name experiment_name] [--gen generation_number]
+julia --project=. benchmark_models.jl --exp-name trial_7 --gen 20
 ```
-```
-
-### 処理内容
-1.  **データの厳密な読み込み:** `Phase5.load_wake_data` を使用し、進化計算時と全く同じデータ条件を保証します。
-2.  **標準モデルの最適化:** JensenモデルとBastankhahモデルの係数を最適化します。
-3.  **LLMモデルの再最適化:** 全履歴から自動検出された最良モデル（例: Gen 12）に対し、負の値（オフセット項）も許容する**手動チューニングされた範囲**で再最適化を行い、真の性能を引き出します。
-4.  **サマリー生成:** 詳細な結果をテキストファイルに出力します。
-
-### 出力
-- `results/{exp_name}/plots/benchmark_profiles_xN.png`: 各モデルの速度プロファイル比較図
-- `results/{exp_name}/plots/benchmark_summary.txt`: **詳細なベンチマーク結果**（数式、係数、データ条件、改善率など）
+- **特徴**: LLMモデルに対しては、負の値（オフセット項）も許容する**厳密な最適化**を行い、真の性能を引き出します。
+- **出力**: `results/{exp_name}/plots/benchmark_summary.txt` に詳細な比較結果（改善率など）が出力されます。
 
 ---
 

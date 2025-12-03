@@ -167,7 +167,36 @@ julia --project=. analyze_reason_correlation.jl --exp-name trial_8
     - `results/{exp_name}/plots/reason_vs_mse_dist.png`: スコアごとの分布図
     - コンソールに相関係数と統計情報を表示。
 
-### 5.6 物理的妥当性の推移分析 (Physics Validity Trend)
+### 5.6 APIによるReasonの精密評価 (Advanced API Evaluation)
+
+LLM (Gemini 1.5 Pro等) を使用して、Reasonの質を「専門家」の視点で厳密に評価します。
+
+**準備**:
+1. `templates/system_prompt.md` (専門家の役割定義)
+2. `templates/task_prompt.txt` (評価タスクのテンプレート)
+3. 環境変数 `GOOGLE_API_KEY` の設定
+4. パッケージのインストール: `julia --project=. -e 'using Pkg; Pkg.add("GoogleGenAI")'`
+
+**使用方法**:
+```bash
+export GOOGLE_API_KEY="AIza..."
+julia --project=. evaluate_reason_api.jl --gen 20 --exp-name trial_8 --model gemini-1.5-pro-latest
+```
+    - 各モデルに対する詳細な評価レポート（6ステップ）とスコア（0.0-1.0）が記録されます。
+
+### 5.7 評価精度の検証 (Verification of Evaluation Quality)
+
+新しく導入したAPI評価が、従来のルールベース評価よりも優れているか（MSEとの相関が高いか）を検証します。
+
+```bash
+julia --project=. compare_reason_scores.jl
+```
+- **出力**:
+    - コンソール: 新旧スコアの相関係数比較
+    - `results/{exp_name}/plots/score_comparison_scatter.png`: 散布図比較
+    - `results/{exp_name}/plots/score_comparison_dist.png`: 分布比較
+
+### 5.8 物理的妥当性の推移分析 (Physics Validity Trend)
 
 物理制約を完全に満たしている（ペナルティ合計が0）モデルの割合が、世代ごとにどう推移しているかを可視化します。
 

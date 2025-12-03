@@ -7,7 +7,9 @@ Phase 6 では、Phase 5 の進化フレームワークを拡張し、**「物�
 ### 主な変更点
 - **評価関数**: $Score = MSE \times (1 + Penalty_{Physics}) \times (1 - 0.2 \times Score_{Reason})$
     - **Physics Penalty**: P1〜P4 の物理制約違反に基づくペナルティ。
-    - **Reason Score**: LLMの生成した `reason` の質（0.0〜1.0）。良い説明には最大20%のスコアボーナスを与える。
+    - **Reason Score**: LLMの生成した `reason` の質（0.0〜1.0）。
+        - **デフォルト**: ルールベース評価 (`ReasonScorer.jl`)。
+        - **拡張**: APIベースの3段階評価 (`evaluate_reason_api.jl`)。
 - **モジュール構成**: `src/Phase6/` 下に機能を分割（Physics, ReasonScorer, Evaluator, Optimizer）。
 
 ---
@@ -21,7 +23,8 @@ julia --project=.
 ```
 
 ### 必要なファイル
-- `run_phase6.jl`: 実行スクリプト
+- `run_phase6.jl`: メイン実行スクリプト
+- `simulate_llm_evolution.jl`: 進化シミュレーションスクリプト
 - `templates/phase6_prompt.md`: プロンプトテンプレート
 - `seeds.json`: 初期シード（Trial 7までのベストモデルを含む）
 
@@ -55,23 +58,10 @@ julia --project=.
 julia --project=. simulate_llm_evolution.jl --start 2 --end 10 --exp-name trial_phase6_01
 ```
 
-**内部プロセス (自動化されています)**:
-1.  **コンテキスト構築**: 前世代のベストモデル、ペナルティ、Reasonスコアを読み込み。
+**内部プロセス (自動化)**:
+1.  **コンテキスト構築**: 前世代のベストモデル、ペナルティ(P1-P4)、Reasonスコアを読み込み。
 2.  **モデル生成**: 物理制約を満たすよう変異・改良。
-3.  **評価と保存**: `models_genX.json` を保存し、`run_phase6.jl` で評価を実行。
-
-### Step 2: 進化と淘汰 (Generation 2+)
-シミュレーションスクリプトにより自動化されていますが、論理的なステップは以下の通りです：
-
-1.  **コンテキスト構築**:
-    - 前世代のベストモデル（Top 3-5）
-    - **ペナルティ内訳 (P1-P4)**: どの物理制約に違反したか。
-    - **Reasonスコア**: 説明の質。
-2.  **LLMへの指示 (Simulation)**:
-    - 物理制約（P1-P4）を満たすように修正。
-    - Reason に「どのペナルティを修正したか」を明記させる。
-3.  **評価と保存**:
-    - `models_genX.json` -> `feedback_genX.json`
+3.  **評価と保存**: `run_phase6.jl` が呼び出され、MSEとペナルティを計算。
 
 ### Step 3: 分析と選定
 各世代の終了時、またはトライアル終了時に分析を行います。
@@ -111,113 +101,61 @@ LLMの `reason` フィールドをテキスト解析します。
 ## 5. 分析・評価ツール (Analysis & Evaluation Tools)
 
 ### 5.1 ベースラインのキャリブレーション (Calibration)
-
 評価の一貫性を保つため、標準モデル（Jensen, Bastankhah）の最適係数を事前に厳密に計算し、固定します。
-
-**使用方法**:
 ```bash
 julia --project=. calibrate_baselines.jl
 ```
-- 入力データ（`data/result_I0p3000_C22p0000.csv`）に対応する設定ファイル `params/standard_models_result_I0p3000_C22p0000.json` が生成されます。
-- このファイルが存在する場合、以下のツールは自動的にこれを読み込みます。
 
 ### 5.2 モデルの詳細分析 (Inspection)
-
 特定の世代の特定のモデルを個別に可視化し、CFDデータと比較します。
-
-**使用方法**:
 ```bash
-# 特定の世代の最良モデルを描画 (例: Gen 20)
 julia --project=. inspect_model.jl --gen 20 --best --exp-name trial_8
-
-# 特定の世代の特定IDのモデルを描画 (例: Gen 7, ID 3)
-julia --project=. inspect_model.jl --gen 7 --id 3 --exp-name trial_8
 ```
 
 ### 5.3 ベンチマークと最終評価 (Benchmarking)
-
 発見された最良モデルを、標準的な後流モデルと厳密に比較します。
-
-**使用方法**:
 ```bash
 julia --project=. benchmark_models.jl --exp-name trial_8 --gen 20
 ```
-- **出力**: `results/{exp_name}/plots/benchmark_summary.txt` に詳細な比較結果が出力されます。
 
 ### 5.4 進化系統の追跡 (Lineage Tracing)
-
 最良モデルがどのように進化してきたか、その系譜を可視化します。
-
-**使用方法**:
 ```bash
 julia --project=. trace_evolution_lineage.jl --exp-name trial_8
 ```
-- **出力**: `results/{exp_name}/evolution_lineage.md` (Mermaidグラフ付きレポート)
 
 ### 5.5 ReasonとMSEの相関分析 (Reason-MSE Correlation)
-
 LLMが生成した「Reason（説明）」の質（Reason Score）と、実際のモデル性能（MSE）に相関があるかを分析します。
-
-**使用方法**:
 ```bash
 julia --project=. analyze_reason_correlation.jl --exp-name trial_8
 ```
-- **出力**:
-    - `results/{exp_name}/plots/reason_vs_mse_scatter.png`: 散布図
-    - `results/{exp_name}/plots/reason_vs_mse_dist.png`: スコアごとの分布図
-    - コンソールに相関係数と統計情報を表示。
 
 ### 5.6 APIによるReasonの精密評価 (Advanced API Evaluation)
-
 LLM (Gemini 1.5 Pro等) を使用して、Reasonの質を「専門家」の視点で厳密に評価します。
+**3段階チェーン評価**（論理抽出 -> 物理検証 -> スコアリング）を行い、ルールベース評価よりも高精度な判定を行います。
 
 **準備**:
-1. `templates/system_prompt.md` (専門家の役割定義)
-2. `templates/task_prompt.txt` (評価タスクのテンプレート)
-3. 環境変数 `GOOGLE_API_KEY` の設定
-4. パッケージのインストール: `julia --project=. -e 'using Pkg; Pkg.add("GoogleGenAI")'`
+1. `templates/` 配下のプロンプトファイル (`system_prompt.md`, `task_step1.txt` 等) が必要です。
+2. 環境変数 `GOOGLE_API_KEY` を設定してください。
 
 **使用方法**:
 ```bash
 export GOOGLE_API_KEY="AIza..."
 julia --project=. evaluate_reason_api.jl --gen 20 --exp-name trial_8 --model gemini-1.5-pro-latest
 ```
-    - 各モデルに対する詳細な評価レポート（6ステップ）とスコア（0.0-1.0）が記録されます。
 
 ### 5.7 評価精度の検証 (Verification of Evaluation Quality)
-
 新しく導入したAPI評価が、従来のルールベース評価よりも優れているか（MSEとの相関が高いか）を検証します。
-
 ```bash
 julia --project=. compare_reason_scores.jl
 ```
-- **出力**:
-    - コンソール: 新旧スコアの相関係数比較
-    - `results/{exp_name}/plots/score_comparison_scatter.png`: 散布図比較
-    - `results/{exp_name}/plots/score_comparison_dist.png`: 分布比較
+- **出力**: 新旧スコアの相関係数比較、散布図、分布図。
 
 ### 5.8 物理的妥当性の推移分析 (Physics Validity Trend)
-
 物理制約を完全に満たしている（ペナルティ合計が0）モデルの割合が、世代ごとにどう推移しているかを可視化します。
-
-**使用方法**:
 ```bash
 julia --project=. analyze_physics_validity.jl --exp-name trial_8
 ```
-- **出力**:
-    - `results/{exp_name}/plots/physics_validity_trend.png`: 推移グラフ
-    - コンソールに開始・終了時の妥当性割合と変化ポイントを表示。
-
----
-
-## 6. トラブルシューティング
-
-### ペナルティが減らない場合
-- プロンプトで物理制約の重要性を強調する。
-- 具体的な違反箇所（例：「遠方で再加速している」）をフィードバックに含める。
-
-### Reason が定型的になる場合
-- 「なぜその項を追加したのか」「物理的にどういう意味があるのか」を問うプロンプトに切り替える。
 
 ---
 

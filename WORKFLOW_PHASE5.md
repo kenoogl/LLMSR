@@ -48,6 +48,7 @@ julia --project=. main.jl
     - このファイルには、Geminiへの指示が含まれています（`templates/phase5_prompt.md` を使用）。
     - `seeds.json` が存在する場合、そこからシードモデルが自動的にロードされ、LLMに過去の成功モデルが提供されます。
     - 別のシードファイルを使用するには: `--seeds-file path/to/seeds.json` を指定します。
+    - **シードを使用しない場合**: `--seeds-file NO_SEEDS` のように存在しないファイル名を指定してください。
 
 **内容確認**:
 ```bash

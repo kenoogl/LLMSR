@@ -22,7 +22,7 @@ using Random
 using SHA
 
 # Include necessary modules
-include("src/Phase5/Phase5.jl")
+include("../Phase5/Phase5.jl")
 using .Phase5
 
 # --- Configuration ---
@@ -127,6 +127,13 @@ function main()
 
     # Set seed
     Random.seed!(SEED)
+
+    # 0. Check if output exists
+    if isfile(OUTPUT_FILE)
+        println("ℹ️  Calibration file already exists: $OUTPUT_FILE")
+        println("   Skipping calibration. Delete this file to re-run.")
+        return
+    end
 
     # 1. Load Data
     println("📂 Loading Data...")

@@ -5,7 +5,7 @@ using Statistics
 using Dates
 
 export save_feedback, load_models, append_history, calculate_diversity, 
-       generate_initial_feedback, format_model_for_display, select_diverse_elites, load_seeds, update_seeds
+       generate_initial_feedback, format_model_for_display, select_diverse_elites, load_seeds, update_seeds, load_env
 
 """
     save_feedback(generation::Int, evaluated::Vector, filepath::String)
@@ -169,6 +169,35 @@ function load_seeds(filepath::String)
     catch e
         @error "Failed to load seeds" e
         return Dict[]
+    end
+end
+
+function load_env(filepath::String=".env")
+    if !isfile(filepath)
+        return
+    end
+    
+    for line in eachline(filepath)
+        line = strip(line)
+        if isempty(line) || startswith(line, "#")
+            continue
+        end
+        
+        parts = split(line, "=", limit=2)
+        if length(parts) == 2
+            key = strip(parts[1])
+            value = strip(parts[2])
+            
+            # Remove quotes if present
+            if (startswith(value, "\"") && endswith(value, "\"")) || 
+               (startswith(value, "'") && endswith(value, "'"))
+                value = value[2:end-1]
+            end
+            
+            if !haskey(ENV, key)
+                ENV[key] = value
+            end
+        end
     end
 end
 

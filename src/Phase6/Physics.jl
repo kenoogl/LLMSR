@@ -11,11 +11,11 @@ export calculate_penalty, calculate_individual_penalties
 Calculates individual physical penalties (P1-P4) using both data and virtual point evaluation.
 """
 function calculate_individual_penalties(ex, coeffs, y_pred, x, r, k, omega, nut)
-    # Weights (from user prompt)
-    λ1 = 1.0 # Decay
+    # Weights (Relaxed for Phase 7)
+    λ1 = 0.5 # Decay (Reduced from 1.0)
     λ2 = 0.5 # Symmetry
     λ3 = 2.0 # Range
-    λ4 = 0.2 # Nut consistency
+    λ4 = 0.1 # Nut consistency (Reduced from 0.2)
 
     # Mean values for virtual checks
     k_mean = mean(k)
@@ -31,8 +31,9 @@ function calculate_individual_penalties(ex, coeffs, y_pred, x, r, k, omega, nut)
     # Check diffs (should be negative for decay, i.e., y decreases)
     # diff(y) = y[i+1] - y[i]. If > 0, it's increasing (bad).
     diffs = diff(y_p1)
-    # Sum of positive increases (violations)
-    p1_decay = sum(max.(diffs, 0.0)) * 10.0
+    # Sum of positive increases (violations) with margin
+    margin_p1 = 1e-4
+    p1_decay = sum(max.(diffs .- margin_p1, 0.0)) * 10.0
     
     # Asymptotic check (x -> 1000, r -> 100)
     y_inf_x = Evaluator.eval_model(ex, coeffs, [1000.0], [0.0], [k_mean], [omega_mean], [nut_mean])
@@ -40,7 +41,7 @@ function calculate_individual_penalties(ex, coeffs, y_pred, x, r, k, omega, nut)
     
     p1_asymp = (max(abs(y_inf_x[1]) - 1e-3, 0.0) + max(abs(y_inf_r[1]) - 1e-3, 0.0)) * 5.0
     
-    P1 = p1_decay + p1_asymp
+    P1 = min(p1_decay + p1_asymp, 100.0) # Cap at 100.0
 
     # --- P2: r-direction Symmetry ---
     # Check y(r) == y(-r) at x=10
@@ -51,7 +52,7 @@ function calculate_individual_penalties(ex, coeffs, y_pred, x, r, k, omega, nut)
     # Compare pairs: |y(0.5) - y(-0.5)| + |y(1.0) - y(-1.0)|
     diff_sym1 = abs(y_p2[1] - y_p2[2])
     diff_sym2 = abs(y_p2[3] - y_p2[4])
-    P2 = (diff_sym1 + diff_sym2) * 10.0
+    P2 = min((diff_sym1 + diff_sym2) * 10.0, 100.0) # Cap at 100.0
 
     # --- P3: Physical Range ---
     # Check data predictions: 0 <= y <= 1.2
@@ -59,7 +60,7 @@ function calculate_individual_penalties(ex, coeffs, y_pred, x, r, k, omega, nut)
     neg_violation = sum(y_pred .< -0.01)
     large_violation = sum(y_pred .> 1.2)
     total_points = length(y_pred)
-    P3 = ((neg_violation * 5.0 + large_violation) / total_points) * 10.0
+    P3 = min(((neg_violation * 5.0 + large_violation) / total_points) * 10.0, 100.0) # Cap at 100.0
 
     # --- P4: Turbulence Consistency (Nut) ---
     # Check if increasing nut enhances mixing (reduces peak deficit).
@@ -70,8 +71,9 @@ function calculate_individual_penalties(ex, coeffs, y_pred, x, r, k, omega, nut)
     y_high = Evaluator.eval_model(ex, coeffs, x_nut, r_nut, [k_mean], [omega_mean], [nut_mean * 1.5])
     
     # Expect y_high < y_base (more mixing -> lower peak)
-    # Penalty if y_high > y_base
-    P4 = max(y_high[1] - y_base[1], 0.0) * 10.0
+    # Penalty if y_high > y_base (with margin)
+    margin_p4 = 1e-4
+    P4 = min(max(y_high[1] - y_base[1] - margin_p4, 0.0) * 10.0, 100.0) # Cap at 100.0
 
     return (P1=P1*λ1, P2=P2*λ2, P3=P3*λ3, P4=P4*λ4)
 end

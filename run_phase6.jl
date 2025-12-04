@@ -139,8 +139,59 @@ function evaluate_generation(gen::Int, input_file::String, csv_path::String, exp
     if isempty(evaluated)
         error("All models failed!")
     end
+
+    # --- Diversity Bonus (Phase 7) ---
+    println("\n🌈 Calculating Diversity Bonus...")
     
-    # Sort by Score (Lower is better)
+    # 1. Collect predictions for all valid models
+    valid_indices = [i for (i, m) in enumerate(evaluated)]
+    if !isempty(valid_indices)
+        # Re-evaluate to get predictions (y_pred)
+        # Note: This is a bit expensive but necessary if we didn't store y_pred.
+        # Ideally, evaluate_model_full should return y_pred, but for now we re-calc or just use coefficients.
+        # Actually, let's use a simplified approach: Diversity in Coefficients is hard because structures differ.
+        # Diversity in Prediction is best.
+        
+        # Load data once
+        df = Phase6.load_wake_data(csv_path)
+        x_data = df.x
+        r_data = df.r
+        k_data = df.k
+        omega_data = df.omega
+        nut_data = df.nut
+        
+        predictions = []
+        for rec in evaluated
+            # Re-evaluate using optimized coefficients
+            ex = Phase6.Evaluator.parse_model_expression(rec.model)
+            y_pred = Phase6.Evaluator.eval_model(ex, rec.coeffs, x_data, r_data, k_data, omega_data, nut_data)
+            push!(predictions, y_pred)
+        end
+        
+        # 2. Calculate Ensemble Mean
+        y_ensemble = mean(predictions)
+        
+        # 3. Calculate Diversity Score and Update Final Score
+        for (i, rec) in enumerate(evaluated)
+            y_pred = predictions[i]
+            # MSE from ensemble mean
+            div_score = mean((y_pred .- y_ensemble).^2)
+            
+            # Bonus: Higher diversity -> Lower Score (Better)
+            # New Score = Old Score / (1 + 5.0 * Diversity)
+            # We use a factor of 5.0 to make it significant but not overwhelming.
+            bonus_factor = 1.0 + 5.0 * div_score
+            new_score = rec.score / bonus_factor
+            
+            # Update record (Need to reconstruct NamedTuple or use Mutable struct. NamedTuple is immutable)
+            # We'll create a new list of records
+            evaluated[i] = merge(rec, (score=new_score, diversity=div_score, original_score=rec.score))
+            
+            @printf "   Model %d: Div=%.6f, Bonus=%.2fx, Score: %.6f -> %.6f\n" rec.id div_score bonus_factor rec.score new_score
+        end
+    end
+    
+    # Sort by New Score (Lower is better)
     sort!(evaluated, by=x->x.score)
     
     # Statistics

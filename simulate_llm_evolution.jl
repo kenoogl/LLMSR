@@ -2,6 +2,12 @@ using JSON3
 using Random
 using Printf
 using ArgParse
+using GoogleGenAI
+
+# Load Project Modules
+push!(LOAD_PATH, joinpath(@__DIR__, "src"))
+include("src/Phase6/EvolutionUtils.jl")
+using .EvolutionUtils
 
 function parse_commandline()
     s = ArgParseSettings()
@@ -18,6 +24,10 @@ function parse_commandline()
             help = "Experiment name"
             arg_type = String
             default = "trial_8"
+        "--stage"
+            help = "Evolution Stage (1: Diversity, 2: Hybrid, 3: Fitting)"
+            arg_type = Int
+            default = 3 # Default to standard fitting/evolution
     end
     return parse_args(s)
 end
@@ -47,17 +57,67 @@ function generate_initial_candidates()
     ]
 end
 
-function simulate_llm(gen_start, gen_end, exp_name)
+function generate_diversity_population()
+    println("   ✨ Generating diverse population using Gemini API (Stage 1)...")
+    
+    # Load Prompts
+    system_prompt = read("templates/phase6_diversity_system.md", String)
+    user_prompt = read("templates/phase6_diversity_user.md", String)
+    
+    # Append JSON instruction
+    user_prompt *= "\n\nIMPORTANT: Output the result as a JSON list of strings, e.g., [\"formula1\", \"formula2\"]. Do not include markdown code blocks or explanations."
+    
+    # Call Gemini API
+    secret_key = ENV["GOOGLE_API_KEY"]
+    # model = GoogleGenAI.GeminiModel("gemini-1.5-pro-latest", api_key=secret_key) # Incorrect usage
+    
+    # Correct usage based on evaluate_reason_api.jl
+    # Using gemini-2.5-pro as requested
+    response = GoogleGenAI.generate_content(secret_key, "gemini-2.5-pro", "$system_prompt\n\n$user_prompt")
+    text = response.text
+    
+    # Parse JSON
+    try
+        # Clean up markdown code blocks if present
+        text = replace(text, r"```json" => "")
+        text = replace(text, r"```" => "")
+        text = strip(text)
+        
+        formulas = JSON3.read(text, Vector{String})
+        
+        models = []
+        for (i, f) in enumerate(formulas)
+            push!(models, Dict(
+                "id" => i,
+                "formula" => f,
+                "num_coeffs" => 4, # Default assumption, optimizer will handle unused
+                "reason" => "Stage 1 Diversity Generation: $f",
+                "ep_type" => "Diversity"
+            ))
+        end
+        return models
+    catch e
+        println("   ⚠️ Failed to parse LLM response: $e")
+        println("   Response was: $text")
+        return generate_initial_candidates() # Fallback
+    end
+end
+
+function simulate_llm(gen_start, gen_end, exp_name, stage)
     for gen in gen_start:gen_end
         output_file = "results/$exp_name/models_gen$gen.json"
-        println("\n🤖 Simulating LLM for Generation $gen...")
+        println("\n🤖 Simulating LLM for Generation $gen (Stage $stage)...")
 
         new_models = []
         
         if gen == 1
             # Gen 1: Initial Population
-            println("   Generating initial population (Gen 1)...")
-            new_models = generate_initial_candidates()
+            if stage == 1
+                new_models = generate_diversity_population()
+            else
+                println("   Using standard hardcoded initial population (Stage $stage)...")
+                new_models = generate_initial_candidates()
+            end
         else
             # Gen 2+: Evolution from previous generation
             prev_gen = gen - 1
@@ -147,6 +207,7 @@ function simulate_llm(gen_start, gen_end, exp_name)
         end
         
         # Save models
+        mkpath(dirname(output_file))
         json_data = Dict("generation" => gen, "models" => new_models)
         open(output_file, "w") do io
             JSON3.pretty(io, json_data)
@@ -161,6 +222,7 @@ function simulate_llm(gen_start, gen_end, exp_name)
 end
 
 if abspath(PROGRAM_FILE) == @__FILE__
+    EvolutionUtils.load_env()
     args = parse_commandline()
-    simulate_llm(args["start"], args["end"], args["exp-name"])
+    simulate_llm(args["start"], args["end"], args["exp-name"], args["stage"])
 end

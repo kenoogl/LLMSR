@@ -5,8 +5,8 @@ using Printf
 using Dates
 
 # Load helper modules
-push!(LOAD_PATH, joinpath(@__DIR__, "src"))
-include("src/Phase6/EvolutionUtils.jl")
+push!(LOAD_PATH, joinpath(@__DIR__, "../"))
+include("../Phase6/EvolutionUtils.jl")
 using .EvolutionUtils
 
 const API_KEY = get(ENV, "GOOGLE_API_KEY", "")

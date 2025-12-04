@@ -118,9 +118,16 @@ function main()
     )
     
     # Plot Mean points
+    # Calculate asymmetric error bars for log scale
+    # Ensure lower bound doesn't go below min(mse) or 0
+    min_mse = minimum(df.mse)
+    lower_bound = max.(stats.mean_mse .- stats.std_mse, min_mse)
+    lower_error = stats.mean_mse .- lower_bound
+    upper_error = stats.std_mse
+    
     plot!(p2, stats.reason_group, stats.mean_mse,
         seriestype=:scatter,
-        yerror=stats.std_mse,
+        yerror=(lower_error, upper_error),
         label="Mean ± Std",
         markercolor=:red,
         markersize=6,

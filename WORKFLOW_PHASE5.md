@@ -192,7 +192,7 @@ julia --project=. semi_auto_evolution.jl --evaluate 2 [--exp-name experiment_nam
 任意の時点で、これまでの進化の様子を確認できます：
 
 ```bash
-julia --project=. visualize_evolution.jl [--exp-name experiment_name]
+julia --project=. src/analysis/visualize_evolution.jl [--exp-name experiment_name]
 ```
 
 **出力**:
@@ -280,13 +280,30 @@ julia --project=. semi_auto_evolution.jl --generate-initial --exp-name gpt4_tria
 julia --project=. semi_auto_evolution.jl --evaluate 1 --exp-name gpt4_trial
 
 # 可視化
-julia --project=. visualize_evolution.jl --exp-name gpt4_trial
+julia --project=. src/analysis/visualize_evolution.jl --exp-name gpt4_trial
 
-# ベンチマーク
-julia --project=. benchmark_models.jl --exp-name gpt4_trial
-```
-
-結果は `results/gpt4_trial/` ディレクトリに保存されます。デフォルトは `results/default/` です。
+# 最終評価とレポート生成
+# `finalize_trial.jl` は以下のスクリプトを順次実行します：
+# 0.  `calibrate_baselines.jl`: ベースラインのキャリブレーション（初回のみ実行）
+# 1.  `visualize_evolution.jl`: スコア推移の可視化
+# 2.  `analyze_physics_validity.jl`: 物理的妥当性の推移
+# 3.  `trace_evolution_lineage.jl`: 進化系統樹の作成
+# 4.  `analyze_reason_correlation.jl`: ReasonスコアとMSEの相関
+# 5.  `benchmark_models.jl`: ベストモデルのベンチマーク
+# 6.  `evaluate_reason_api.jl` (Option): APIによる詳細評価
+# 7.  `prepare_report.jl`: レポート用コンテキストの生成
+# julia --project=. src/analysis/finalize_trial.jl --exp-name gpt4_trial
+#
+# 可視化
+julia --project=. src/a`finalize_trial.jl` は以下のスクリプトを順次実行します：
+0.  `calibrate_baselines.jl`: ベースラインのキャリブレーション（初回のみ実行）
+1.  `visualize_evolution.jl`: スコア推移の可視化
+2.  `analyze_physics_validity.jl`: 物理的妥当性の推移
+3.  `trace_evolution_lineage.jl`: 進化系統樹の作成
+4.  `analyze_reason_correlation.jl`: ReasonスコアとMSEの相関
+5.  `benchmark_models.jl`: ベストモデルのベンチマーク
+6.  `evaluate_reason_api.jl` (Option): APIによる詳細評価
+7.  `prepare_report.jl`: レポート用コンテキストの生成`results/gpt4_trial/` ディレクトリに保存されます。デフォルトは `results/default/` です。
 
 ---
 
@@ -347,7 +364,7 @@ EP3で修正を依頼。
 - [ ] 世代16-20: 精緻化と簡素化
 - [ ] 可視化実行
 - [ ] 最良モデルの検証（ベンチマーク）
-- [ ] レポート作成（`prepare_report.jl` 実行）
+- [ ] レポート作成（`src/analysis/prepare_report.jl` 実行）
 
 ---
 
@@ -404,7 +421,7 @@ Phase 6 で導入された高度な分析ツールは、Phase 5 でもそのま�
 
 **使用方法**:
 ```bash
-julia --project=. calibrate_baselines.jl
+julia --project=. src/analysis/calibrate_baselines.jl
 ```
 - 入力データ（`data/result_I0p3000_C22p0000.csv`）に対応する設定ファイル `params/standard_models_result_I0p3000_C22p0000.json` が生成されます。
 - このファイルが存在する場合、以下のツールは自動的にこれを読み込みます。
@@ -416,10 +433,10 @@ julia --project=. calibrate_baselines.jl
 **使用方法**:
 ```bash
 # 特定の世代の最良モデルを描画 (例: Gen 20)
-julia --project=. inspect_model.jl --gen 20 --best --exp-name trial_7
+julia --project=. src/analysis/inspect_model.jl --gen 20 --best --exp-name trial_7
 
 # 特定の世代の特定IDのモデルを描画 (例: Gen 7, ID 3)
-julia --project=. inspect_model.jl --gen 7 --id 3 --exp-name trial_7
+julia --project=. src/analysis/inspect_model.jl --gen 7 --id 3 --exp-name trial_7
 ```
 - **特徴**: キャリブレーション済みの標準モデルと比較するため、常に同じ基準線で評価できます。
 
@@ -429,7 +446,7 @@ julia --project=. inspect_model.jl --gen 7 --id 3 --exp-name trial_7
 
 **使用方法**:
 ```bash
-julia --project=. benchmark_models.jl --exp-name trial_7 --gen 20
+julia --project=. src/analysis/benchmark_models.jl --exp-name trial_7 --gen 20
 ```
 - **特徴**: LLMモデルに対しては、負の値（オフセット項）も許容する**厳密な最適化**を行い、真の性能を引き出します。
 - **出力**: `results/{exp_name}/plots/benchmark_summary.txt` に詳細な比較結果（改善率など）が出力されます。
@@ -443,7 +460,7 @@ julia --project=. benchmark_models.jl --exp-name trial_7 --gen 20
 ### 使用方法
 
 ```bash
-julia --project=. trace_evolution_lineage.jl [--exp-name experiment_name]
+julia --project=. src/analysis/trace_evolution_lineage.jl [--exp-name experiment_name]
 ```
 
 ### 処理内容
@@ -463,7 +480,7 @@ julia --project=. trace_evolution_lineage.jl [--exp-name experiment_name]
 ### 使用方法
 
 ```bash
-julia --project=. prepare_report.jl [--exp-name experiment_name]
+julia --project=. src/analysis/prepare_report.jl [--exp-name experiment_name]
 ```
 
 ### 処理内容

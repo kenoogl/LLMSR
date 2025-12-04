@@ -32,36 +32,30 @@ julia --project=.
 
 ## 3. 実行サイクル (Evolution Loop)
 
-### Step 1: 初期集団の生成 (Generation 1)
-`seeds.json` のモデルと、LLMによる新規生成モデルを組み合わせて初期集団を作ります。
+### Step 1: 初期集団の生成 (Stage 1: Diversity Generation)
+多様性を最大化するため、LLMを使用して構造的に異なるモデルを生成します。
 
-1.  **初期フィードバック生成**:
-    ```bash
-    # seeds.json を使用する場合 (デフォルト)
-    julia --project=. run_phase6.jl --generate-initial --exp-name trial_phase6_01
-
-    # seeds.json を使用せず、完全にゼロから始める場合
-    julia --project=. run_phase6.jl --generate-initial --exp-name trial_phase6_01 --seeds-file NO_SEEDS
-    ```
-2.  **シミュレーション実行 (Gen 1)**:
-    `simulate_llm_evolution.jl` を使用して、初期集団の生成と評価を行います。
-    ```bash
-    julia --project=. simulate_llm_evolution.jl --start 1 --end 1 --exp-name trial_phase6_01
-    ```
-
-### Step 2: 進化と淘汰 (Generation 2+)
-前世代の評価結果を元に、LLM（シミュレータ）が新しいモデルを生成し、評価するサイクルを繰り返します。
-
-**実行コマンド**:
 ```bash
-# 例: Gen 2 から Gen 10 までを一気に実行
-julia --project=. simulate_llm_evolution.jl --start 2 --end 10 --exp-name trial_phase6_01
+# Stage 1: Diversity Generation (Gen 1)
+# Gemini APIを使用して、ガウス型以外の多様な構造（有理関数、合成関数など）を生成します。
+export GOOGLE_API_KEY="AIza..."
+julia --project=. simulate_llm_evolution.jl --start 1 --end 1 --exp-name trial_10 --stage 1
 ```
 
-**内部プロセス (自動化)**:
-1.  **コンテキスト構築**: 前世代のベストモデル、ペナルティ(P1-P4)、Reasonスコアを読み込み。
-2.  **モデル生成**: 物理制約を満たすよう変異・改良。
-3.  **評価と保存**: `run_phase6.jl` が呼び出され、MSEとペナルティを計算。
+### Step 2: 進化と淘汰 (Stage 2 & 3)
+生成された多様なモデルを親として、進化計算を行います。
+
+```bash
+# Stage 3: Fitting & Selection (Gen 2-20)
+# 標準的な進化プロセス（変異・交差・淘汰）を実行します。
+julia --project=. simulate_llm_evolution.jl --start 2 --end 20 --exp-name trial_10 --stage 3
+```
+
+**ステージ構成**:
+- **Stage 1 (Diversity)**: ガウス型を禁止し、構造的多様性を最大化するプロンプトを使用。
+- **Stage 2 (Hybrid)**: （将来拡張）異なる構造の融合を促進。
+- **Stage 3 (Fitting)**: 物理的妥当性と精度を重視した最適化。
+
 
 ### Step 3: 分析と選定
 各世代の終了時、またはトライアル終了時に分析を行います。
@@ -98,68 +92,75 @@ LLMの `reason` フィールドをテキスト解析します。
 
 ---
 
-## 5. 分析・評価ツール (Analysis & Evaluation Tools)
+## 5. 分析・評価 (Analysis & Evaluation)
 
-### 5.1 ベースラインのキャリブレーション (Calibration)
-評価の一貫性を保つため、標準モデル（Jensen, Bastankhah）の最適係数を事前に厳密に計算し、固定します。
+トライアル終了後、以下のコマンドで一括分析を行います。
+
 ```bash
-julia --project=. calibrate_baselines.jl
+# 基本分析（可視化、物理妥当性、系統追跡、ベンチマーク、Reason相関）
+julia --project=. finalize_trial.jl --exp-name trial_10
+
+# API評価を含める場合（コストがかかります）
+julia --project=. finalize_trial.jl --exp-name trial_10 --api-eval
 ```
 
-### 5.2 モデルの詳細分析 (Inspection)
+`finalize_trial.jl` は以下のスクリプトを順次実行します：
+0.  `calibrate_baselines.jl`: ベースラインのキャリブレーション（初回のみ実行）
+1.  `visualize_evolution.jl`: スコア推移の可視化
+2.  `analyze_physics_validity.jl`: 物理的妥当性の推移
+3.  `trace_evolution_lineage.jl`: 進化系統樹の作成
+4.  `analyze_reason_correlation.jl`: ReasonスコアとMSEの相関
+5.  `benchmark_models.jl`: ベストモデルのベンチマーク
+6.  `evaluate_reason_api.jl` (Option): APIによる詳細評価
+7.  `prepare_report.jl`: レポート用コンテキストの生成
+
+---
+
+### 個別実行（詳細分析用）
+
+必要に応じて、各ツールを個別に実行することも可能です。
+
+### 5.1 モデルの詳細分析 (Inspection)
 特定の世代の特定のモデルを個別に可視化し、CFDデータと比較します。
 ```bash
-julia --project=. inspect_model.jl --gen 20 --best --exp-name trial_8
+julia --project=. src/analysis/inspect_model.jl --gen 20 --best --exp-name trial_10
 ```
 
-### 5.3 ベンチマークと最終評価 (Benchmarking)
-発見された最良モデルを、標準的な後流モデルと厳密に比較します。
+### 5.2 APIによるReasonの精密評価 (Advanced API Evaluation)
 ```bash
-julia --project=. benchmark_models.jl --exp-name trial_8 --gen 20
+export GOOGLE_API_KEY="..."
+julia --project=. src/analysis/evaluate_reason_api.jl --gen 20 --exp-name trial_10 --model gemini-2.5-pro
 ```
 
-### 5.4 進化系統の追跡 (Lineage Tracing)
-最良モデルがどのように進化してきたか、その系譜を可視化します。
+### 5.3 レポート作成 (Report Preparation)
+実験結果をまとめたレポート作成用のコンテキストを生成します。
 ```bash
-julia --project=. trace_evolution_lineage.jl --exp-name trial_8
-```
-
-### 5.5 ReasonとMSEの相関分析 (Reason-MSE Correlation)
-LLMが生成した「Reason（説明）」の質（Reason Score）と、実際のモデル性能（MSE）に相関があるかを分析します。
-```bash
-julia --project=. analyze_reason_correlation.jl --exp-name trial_8
-```
-
-### 5.6 APIによるReasonの精密評価 (Advanced API Evaluation)
-LLM (Gemini 1.5 Pro等) を使用して、Reasonの質を「専門家」の視点で厳密に評価します。
-**3段階チェーン評価**（論理抽出 -> 物理検証 -> スコアリング）を行い、ルールベース評価よりも高精度な判定を行います。
-
-**準備**:
-1. `templates/` 配下のプロンプトファイル (`system_prompt.md`, `task_step1.txt` 等) が必要です。
-2. 環境変数 `GOOGLE_API_KEY` を設定してください。
-
-**使用方法**:
-```bash
-export GOOGLE_API_KEY="AIza..."
-julia --project=. evaluate_reason_api.jl --gen 20 --exp-name trial_8 --model gemini-1.5-pro-latest
-```
-
-### 5.7 評価精度の検証 (Verification of Evaluation Quality)
-新しく導入したAPI評価が、従来のルールベース評価よりも優れているか（MSEとの相関が高いか）を検証します。
-```bash
-julia --project=. compare_reason_scores.jl
-```
-- **出力**: 新旧スコアの相関係数比較、散布図、分布図。
-
-### 5.8 物理的妥当性の推移分析 (Physics Validity Trend)
-物理制約を完全に満たしている（ペナルティ合計が0）モデルの割合が、世代ごとにどう推移しているかを可視化します。
-```bash
-julia --project=. analyze_physics_validity.jl --exp-name trial_8
+julia --project=. src/analysis/prepare_report.jl --exp-name trial_10
 ```
 
 ---
 
-## 6. トライアル終了後の処理
 1.  **結果のアーカイブ**: `results/trial_X/`
 2.  **Seeds更新**: 物理的に妥当なベストモデルを `seeds.json` に追加。
 3.  **レポート作成**: 物理的妥当性の検証結果を含める。
+
+---
+
+## 6. 多様性と緩和 (Diversity & Relaxation)
+Phase 6 の「物理制約」が厳しすぎて `x^(-1)` への早期収束を招いたため、Phase 6 の改善として以下の変更を行いました。
+
+### 6.1 制約の緩和 (Relaxed Constraints)
+- **ペナルティ重みの低減**:
+    - Decay (P1): 1.0 -> 0.5
+    - Nut (P4): 0.2 -> 0.1
+- **マージンの導入**: 微小な違反（1e-4以下）は許容。
+- **キャップ設定**: ペナルティ上限を 100.0 に設定し、即死（Inf）を防ぐ。
+
+### 6.2 多様性ボーナス (Diversity Bonus)
+集団の平均的な挙動から離れている（ユニークな）モデルを優遇します。
+
+$$ Score_{new} = \frac{Score_{old}}{1 + 5.0 \times Diversity} $$
+
+- **Diversity**: アンサンブル平均予測からの平均二乗偏差。
+- **効果**: 性能が多少劣っても、ユニークな挙動をするモデルが生き残りやすくなる。
+
